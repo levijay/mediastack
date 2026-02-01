@@ -253,3 +253,10 @@ Inspired by the excellent work of:
 - ✅ Improved search matching (article handling, year tolerance)
 - ✅ Background workers process full library
 - ✅ Mobile-responsive UI improvements
+
+<img width="1780" height="1160" alt="image" src="https://github.com/user-attachments/assets/d242b603-4bba-41cd-9f99-a75eab8a695e" />
+<img width="1790" height="1186" alt="image" src="https://github.com/user-attachments/assets/0714b57a-f7ff-46b6-afe3-e66ee09d0116" />
+<img width="1785" height="995" alt="image" src="https://github.com/user-attachments/assets/774318ea-1e07-4bb9-826a-8ccd821837e6" />
+<img width="1777" height="1268" alt="image" src="https://github.com/user-attachments/assets/c8700995-ac51-4783-9bae-350571cb0dea" />
+
+
