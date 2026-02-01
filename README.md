@@ -171,15 +171,6 @@ curl -H "X-Api-Key: your-api-key" http://localhost:6767/api/movies
 - `GET /api/system/status` - System status
 - `GET /api/system/health` - Health check
 
-## Browser Extension & Mobile App
-
-MediaStack includes companion apps for easy media discovery:
-
-- **Chrome/Edge Extension** - Add movies/shows while browsing TMDB, IMDb, Trakt
-- **Android App** - Manage your library on the go
-
-See the `/apps` directory for installation instructions.
-
 ## Troubleshooting
 
 ### Cannot access web interface
