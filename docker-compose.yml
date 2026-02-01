@@ -1,0 +1,85 @@
+# MediaStack v1.0.0
+# Unified Media Management Platform
+# Web UI on port 6767, API on port 5055
+
+services:
+  # MediaStack Backend API
+  mediastack-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mediastack-api
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/New_York}
+      - NODE_ENV=production
+      - PORT=5055
+      - DB_PATH=/config/mediastack.db
+      - JWT_SECRET=${JWT_SECRET:-changeme_jwt_secret_min_32_chars}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - AUTH_DISABLED=${AUTH_DISABLED:-true}
+    volumes:
+      - ${CONFIG_PATH:-./config}:/config
+      - ${DATA_PATH:-/mnt/user/data}:/data
+      - ${BACKUP_PATH:-./backup}:/backup
+    ports:
+      - "${API_PORT:-5055}:5055"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5055/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MediaStack Web Frontend
+  mediastack-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mediastack-web
+    restart: unless-stopped
+    depends_on:
+      mediastack-api:
+        condition: service_healthy
+    environment:
+      - TZ=${TZ:-America/New_York}
+    ports:
+      - "${WEB_PORT:-6767}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# QUICK START
+# =============================================================================
+# 1. Copy .env.example to .env and configure:
+#    cp .env.example .env
+#    nano .env
+#
+# 2. Generate a secure JWT secret:
+#    openssl rand -base64 32
+#
+# 3. Build and run:
+#    docker-compose up -d --build
+#
+# 4. Access MediaStack:
+#    Web UI: http://localhost:6767
+#    API:    http://localhost:5055
+#
+# 5. First user registered becomes admin
+#
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+# JWT_SECRET      - Required: Secure secret for authentication
+# CONFIG_PATH     - Database and config storage (default: ./config)
+# MOVIES_PATH     - Movie library root folder (default: /mnt/user/media/movies)
+# TV_PATH         - TV library root folder (default: /mnt/user/media/tv)
+# DOWNLOADS_PATH  - Download client output (default: /mnt/user/downloads)
+# BACKUP_PATH     - Database backups (default: ./backup)
+# TZ              - Timezone (default: America/New_York)
+# WEB_PORT        - Web interface port (default: 6767)
+# API_PORT        - API port (default: 5055)
+# AUTH_DISABLED   - Disable auth for testing (default: false)

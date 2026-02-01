@@ -1,0 +1,12 @@
+/* 
+ * Dark theme styles - now integrated into index.css
+ * This file kept for compatibility with import in main.tsx
+ */
+
+.dark {
+  color-scheme: dark;
+}
+
+.light {
+  color-scheme: light;
+}

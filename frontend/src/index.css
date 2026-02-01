@@ -1,0 +1,524 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ============================================================
+ * MEDIASTACK COMPREHENSIVE THEME SYSTEM
+ * ============================================================
+ * 
+ * ALL colors are CSS variables - NO HARDCODED COLORS
+ * Variables are set by:
+ *   1. index.html inline script (flash prevention)
+ *   2. UISettingsContext.tsx applyThemeToDOM()
+ * 
+ * ============================================================
+ */
+
+@layer base {
+  /* Hide until theme variables are set */
+  html:not(.theme-ready) {
+    visibility: hidden;
+  }
+  
+  html.theme-ready {
+    visibility: visible;
+  }
+
+  /* Apply base page background */
+  html, body {
+    background-color: var(--page-bg) !important;
+    color: var(--text-primary) !important;
+    min-height: 100vh;
+  }
+  
+  #root {
+    min-height: 100vh;
+    background-color: var(--page-bg) !important;
+  }
+
+  .min-h-screen {
+    background-color: var(--page-bg) !important;
+  }
+  
+  /* Color scheme */
+  .dark { color-scheme: dark; }
+  .light { color-scheme: light; }
+}
+
+/* ============================================================
+ * OVERRIDE TAILWIND CLASSES TO USE THEME VARIABLES
+ * ============================================================ */
+
+@layer components {
+  /* ========== BACKGROUNDS ========== */
+  .bg-white { background-color: var(--card-bg) !important; }
+  .bg-gray-50 { background-color: var(--page-bg) !important; }
+  .bg-gray-100 { background-color: var(--card-bg) !important; }
+  .bg-gray-200 { background-color: var(--surface-hover) !important; }
+  .bg-gray-300 { background-color: var(--surface-hover) !important; }
+  .bg-gray-700 { background-color: var(--card-bg) !important; }
+  .bg-gray-800 { background-color: var(--card-bg) !important; }
+  .bg-gray-900 { background-color: var(--page-bg) !important; }
+  
+  /* ========== TEXT COLORS ========== */
+  .text-white { color: var(--text-primary) !important; }
+  .text-gray-50 { color: var(--text-primary) !important; }
+  .text-gray-100 { color: var(--text-primary) !important; }
+  .text-gray-200 { color: var(--text-primary) !important; }
+  .text-gray-300 { color: var(--text-muted) !important; }
+  .text-gray-400 { color: var(--text-muted) !important; }
+  .text-gray-500 { color: var(--text-secondary) !important; }
+  .text-gray-600 { color: var(--text-secondary) !important; }
+  .text-gray-700 { color: var(--text-primary) !important; }
+  .text-gray-800 { color: var(--text-primary) !important; }
+  .text-gray-900 { color: var(--text-primary) !important; }
+  
+  /* ========== BORDERS ========== */
+  .border-gray-100 { border-color: var(--border-color) !important; }
+  .border-gray-200 { border-color: var(--border-color) !important; }
+  .border-gray-300 { border-color: var(--border-color) !important; }
+  .border-gray-400 { border-color: var(--border-color) !important; }
+  .border-gray-500 { border-color: var(--border-color) !important; }
+  .border-gray-600 { border-color: var(--border-color) !important; }
+  .border-gray-700 { border-color: var(--border-color) !important; }
+  .border-gray-800 { border-color: var(--border-color) !important; }
+  
+  /* ========== PRIMARY COLORS ========== */
+  .bg-primary-50 { background-color: var(--surface-hover) !important; }
+  .bg-primary-100 { background-color: var(--surface-hover) !important; }
+  .bg-primary-500 { background-color: var(--btn-primary-bg) !important; color: var(--btn-primary-text) !important; }
+  .bg-primary-600 { background-color: var(--btn-primary-bg) !important; color: var(--btn-primary-text) !important; }
+  .bg-primary-700 { background-color: var(--btn-primary-hover) !important; }
+  .bg-primary-900\/20 { background-color: var(--surface-hover) !important; }
+  
+  .text-primary-400 { color: var(--navbar-bg) !important; }
+  .text-primary-500 { color: var(--navbar-bg) !important; }
+  .text-primary-600 { color: var(--navbar-bg) !important; }
+  .text-primary-700 { color: var(--navbar-bg) !important; }
+  
+  .border-primary-500 { border-color: var(--navbar-bg) !important; }
+  .border-primary-600 { border-color: var(--navbar-bg) !important; }
+  
+  .ring-primary-500 { --tw-ring-color: var(--focus-ring) !important; }
+  .focus\:ring-primary-500:focus { --tw-ring-color: var(--focus-ring) !important; }
+  
+  /* ========== HOVER STATES ========== */
+  .hover\:bg-gray-50:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-100:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-200:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-300:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-600:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-700:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-gray-800:hover { background-color: var(--row-hover-bg) !important; }
+  .hover\:bg-primary-700:hover { background-color: var(--btn-primary-hover) !important; }
+  
+  /* ========== DIVIDERS ========== */
+  .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color) !important; }
+  .divide-x > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color) !important; }
+  .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color) !important; }
+  .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color) !important; }
+  .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color) !important; }
+  
+  .border-t { border-top-color: var(--border-color) !important; }
+  .border-b { border-bottom-color: var(--border-color) !important; }
+  .border-l { border-left-color: var(--border-color) !important; }
+  .border-r { border-right-color: var(--border-color) !important; }
+}
+
+/* ============================================================
+ * FORM INPUTS
+ * ============================================================ */
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  background-color: var(--input-bg) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--input-focus-border) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--input-focus-ring) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+/* Checkbox and radio */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--navbar-bg) !important;
+}
+
+/* ============================================================
+ * BUTTON STYLES - All buttons should be rounded
+ * ============================================================ */
+
+button:not(.no-rounded) {
+  border-radius: 0.5rem !important;
+}
+
+/* Range slider - comprehensive styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: var(--hover-bg) !important;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--navbar-bg) !important;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--card-bg);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--navbar-bg) !important;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--card-bg);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--hover-bg) !important;
+  border-radius: 4px;
+  height: 8px;
+}
+
+input[type="range"]::-moz-range-track {
+  background: var(--hover-bg) !important;
+  border-radius: 4px;
+  height: 8px;
+}
+
+/* ============================================================
+ * TABLES
+ * ============================================================ */
+
+table {
+  background-color: var(--table-bg) !important;
+  border-color: var(--table-border) !important;
+}
+
+/* Responsive table wrapper - allows horizontal scrolling on mobile */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 600px; /* Ensures table doesn't get too squished */
+}
+
+@media (max-width: 768px) {
+  .table-responsive {
+    margin: 0 -1rem;
+    padding: 0 1rem;
+    width: calc(100% + 2rem);
+  }
+}
+
+thead,
+thead tr,
+thead th {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--table-border) !important;
+}
+
+tbody tr {
+  border-color: var(--table-border) !important;
+}
+
+tbody tr:hover {
+  background-color: var(--table-row-hover) !important;
+}
+
+td, th {
+  border-color: var(--table-border) !important;
+}
+
+/* ============================================================
+ * CARDS & PANELS
+ * ============================================================ */
+
+.rounded-xl.border,
+.rounded-lg.border,
+.rounded-md.border,
+.rounded.border {
+  background-color: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+  border-width: var(--card-border-width, 1px) !important;
+}
+
+/* Selected card state */
+.card-selected,
+.rounded-xl.border.ring-2,
+.rounded-lg.border.ring-2,
+.poster-card.selected {
+  border-width: var(--card-selected-border-width, 2px) !important;
+  border-color: var(--card-selected-border, var(--navbar-bg)) !important;
+}
+
+/* ============================================================
+ * SHADOWS - Subtle borders, soft shadows
+ * ============================================================ */
+
+.shadow,
+.shadow-sm,
+.shadow-md,
+.shadow-lg,
+.shadow-xl {
+  box-shadow: 0 1px 3px 0 var(--card-shadow), 0 1px 2px -1px var(--card-shadow) !important;
+}
+
+/* ============================================================
+ * SCROLLBARS
+ * ============================================================ */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* ============================================================
+ * LINKS
+ * ============================================================ */
+
+a:not([class*="btn"]):not(.nav-link) {
+  color: var(--text-link);
+}
+
+a:not([class*="btn"]):not(.nav-link):hover {
+  color: var(--text-link-hover);
+}
+
+/* ============================================================
+ * SELECTION
+ * ============================================================ */
+
+::selection {
+  background-color: var(--selected-bg);
+  color: var(--selected-text);
+}
+
+/* ============================================================
+ * LOADING SPINNERS
+ * ============================================================ */
+
+.animate-spin {
+  border-color: var(--spinner-color) !important;
+  border-top-color: transparent !important;
+}
+
+/* ============================================================
+ * STATUS BADGES (Semantic colors - kept for meaning)
+ * ============================================================ */
+
+/* Success/Green */
+.bg-green-50 { background-color: oklch(0.35 0.08 145) !important; }
+.bg-green-100 { background-color: oklch(0.35 0.1 145) !important; }
+.bg-green-500 { background-color: oklch(0.6 0.2 145) !important; }
+.bg-green-600 { background-color: oklch(0.55 0.2 145) !important; }
+.text-green-400 { color: oklch(0.7 0.18 145) !important; }
+.text-green-500 { color: oklch(0.65 0.2 145) !important; }
+.text-green-600 { color: oklch(0.6 0.2 145) !important; }
+.text-green-700 { color: oklch(0.75 0.15 145) !important; }
+.text-green-800 { color: oklch(0.75 0.15 145) !important; }
+.border-green-500 { border-color: oklch(0.6 0.2 145) !important; }
+
+/* Warning/Yellow */
+.bg-yellow-50 { background-color: oklch(0.4 0.08 85) !important; }
+.bg-yellow-100 { background-color: oklch(0.4 0.1 85) !important; }
+.bg-yellow-500 { background-color: oklch(0.75 0.2 85) !important; }
+.text-yellow-300 { color: oklch(0.85 0.15 85) !important; }
+.text-yellow-400 { color: oklch(0.8 0.18 85) !important; }
+.text-yellow-500 { color: oklch(0.75 0.2 85) !important; }
+.text-yellow-800 { color: oklch(0.8 0.15 85) !important; }
+.border-yellow-500 { border-color: oklch(0.75 0.2 85) !important; }
+
+/* Info/Blue */
+.bg-blue-50 { background-color: oklch(0.35 0.08 250) !important; }
+.bg-blue-100 { background-color: oklch(0.35 0.1 250) !important; }
+.bg-blue-500 { background-color: oklch(0.6 0.2 250) !important; }
+.bg-blue-600 { background-color: oklch(0.55 0.2 250) !important; }
+.text-blue-400 { color: oklch(0.7 0.18 250) !important; }
+.text-blue-500 { color: oklch(0.65 0.2 250) !important; }
+.text-blue-800 { color: oklch(0.75 0.15 250) !important; }
+.border-blue-500 { border-color: oklch(0.6 0.2 250) !important; }
+
+/* Error/Red */
+.bg-red-50 { background-color: oklch(0.35 0.08 25) !important; }
+.bg-red-100 { background-color: oklch(0.35 0.1 25) !important; }
+.bg-red-500 { background-color: oklch(0.55 0.2 25) !important; }
+.bg-red-600 { background-color: oklch(0.5 0.2 25) !important; }
+.bg-red-700 { background-color: oklch(0.45 0.2 25) !important; }
+.text-red-400 { color: oklch(0.7 0.18 25) !important; }
+.text-red-500 { color: oklch(0.65 0.2 25) !important; }
+.text-red-600 { color: oklch(0.6 0.2 25) !important; }
+.text-red-800 { color: oklch(0.75 0.15 25) !important; }
+.border-red-500 { border-color: oklch(0.55 0.2 25) !important; }
+
+/* Purple */
+.bg-purple-100 { background-color: oklch(0.35 0.1 300) !important; }
+.bg-purple-500 { background-color: oklch(0.6 0.2 300) !important; }
+.text-purple-400 { color: oklch(0.7 0.18 300) !important; }
+.text-purple-500 { color: oklch(0.65 0.2 300) !important; }
+.text-purple-800 { color: oklch(0.75 0.15 300) !important; }
+
+/* Indigo */
+.bg-indigo-500 { background-color: oklch(0.55 0.2 270) !important; }
+.bg-indigo-600 { background-color: oklch(0.5 0.2 270) !important; }
+.text-indigo-400 { color: oklch(0.7 0.18 270) !important; }
+.text-indigo-500 { color: oklch(0.6 0.2 270) !important; }
+
+/* ============================================================
+ * ANIMATIONS
+ * ============================================================ */
+
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ============================================================
+ * FOCUS STATES
+ * ============================================================ */
+
+.focus\:ring-offset-gray-900:focus {
+  --tw-ring-offset-color: var(--page-bg) !important;
+}
+
+.focus\:ring-2:focus {
+  --tw-ring-color: var(--focus-ring) !important;
+}
+
+/* ============================================================
+ * RING COLORS
+ * ============================================================ */
+
+.ring-gray-500 { --tw-ring-color: var(--border-color) !important; }
+.focus\:ring-gray-500:focus { --tw-ring-color: var(--border-color) !important; }
+
+/* ============================================================
+ * UTILITY CLASSES
+ * ============================================================ */
+
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Prevent horizontal overflow on full-width elements */
+html, body {
+  overflow-x: hidden;
+}
+
+/* ============================================================
+ * RANGE INPUT STYLING
+ * ============================================================ */
+
+/* Reset range input */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 20px; /* Give it height for proper vertical alignment */
+}
+
+/* Track styling for WebKit browsers */
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--border-color);
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Track styling for Firefox */
+input[type="range"]::-moz-range-track {
+  background: var(--border-color);
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Thumb styling for WebKit browsers */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--navbar-bg);
+  border-radius: 50%;
+  margin-top: -6px; /* Center thumb on track: (thumb height - track height) / 2 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Thumb styling for Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--navbar-bg);
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Focus styling */
+input[type="range"]:focus {
+  outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}

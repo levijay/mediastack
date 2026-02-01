@@ -1,0 +1,1 @@
+{"version":3,"file":"BackgroundWorker.d.ts","sourceRoot":"","sources":["../../src/workers/BackgroundWorker.ts"],"names":[],"mappings":"AAKA,qBAAa,gBAAgB;IAC3B,OAAO,CAAC,YAAY,CAA+B;IACnD,OAAO,CAAC,SAAS,CAAkB;IACnC,OAAO,CAAC,SAAS,CAAkB;IAEnC,KAAK;IAkBL,IAAI;YASU,aAAa;CAqB5B;AAED,eAAO,MAAM,gBAAgB,kBAAyB,CAAC"}

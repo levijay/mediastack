@@ -1,0 +1,1098 @@
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Layout } from '../components/layout/Layout';
+import { api } from '../services/api';
+import { Input } from '../components/common/Input';
+import { Button } from '../components/common/Button';
+import { useToast } from '../components/Toast';
+import { useUISettings, themes } from '../contexts/UISettingsContext';
+import { FolderBrowser } from '../components/FolderBrowser';
+import { QualityProfileEditor } from '../components/QualityProfileEditor';
+import { DownloadClientsManager } from '../components/DownloadClientsManager';
+import { IndexersManager } from '../components/IndexersManager';
+import { ImportSection } from '../components/ImportSection';
+import { ImportListsSection } from '../components/ImportListsSection';
+import { ThemeEditor } from '../components/ThemeEditor';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { NamingSettings } from '../components/NamingSettings';
+
+interface QualityProfile {
+  id: string;
+  name: string;
+  cutoff_quality: string;
+  upgrade_allowed: boolean;
+  items: { quality: string; allowed: boolean }[];
+}
+
+interface NamingConfig {
+  rename_movies: boolean;
+  rename_episodes: boolean;
+  replace_illegal_characters: boolean;
+  colon_replacement: string;
+  standard_movie_format: string;
+  movie_folder_format: string;
+  standard_episode_format: string;
+  daily_episode_format: string;
+  anime_episode_format: string;
+  series_folder_format: string;
+  season_folder_format: string;
+  specials_folder_format: string;
+  multi_episode_style: string;
+}
+
+interface Worker {
+  id: string;
+  name: string;
+  description: string;
+  status: 'running' | 'stopped' | 'error';
+  lastRun?: string;
+  interval?: number;
+  errorMessage?: string;
+}
+
+interface MediaManagementTabProps {
+  namingConfig: NamingConfig | null;
+  setNamingConfig: (config: NamingConfig) => void;
+  namingPreview: { movie?: string; episode?: string };
+  setNamingPreview: (preview: { movie?: string; episode?: string }) => void;
+  moviePath: string;
+  setMoviePath: (path: string) => void;
+  tvPath: string;
+  setTvPath: (path: string) => void;
+  browsingFor: 'movie' | 'tv' | null;
+  setBrowsingFor: (type: 'movie' | 'tv' | null) => void;
+  handleSavePaths: () => void;
+  addToast: (toast: { type: 'info' | 'success' | 'warning' | 'error' | 'progress'; message: string }) => void;
+}
+
+function MediaManagementTab(props: MediaManagementTabProps) {
+  const [subTab, setSubTab] = useState<'naming' | 'library'>('naming');
+  
+  const subTabs = [
+    { id: 'naming', label: 'File Naming' },
+    { id: 'library', label: 'Library Paths' },
+  ];
+
+  return (
+    <div>
+      {/* Sub-tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 pt-4">
+        <div className="flex gap-4">
+          {subTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSubTab(tab.id as any)}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                subTab === tab.id
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Naming Sub-tab */}
+      {subTab === 'naming' && (
+        <div className="p-6">
+          {props.namingConfig && (
+            <NamingSettings
+              config={props.namingConfig}
+              onChange={props.setNamingConfig}
+              onSave={async () => {
+                try {
+                  await api.updateNamingConfig(props.namingConfig!);
+                  props.addToast({ type: 'success', message: 'Naming configuration saved!' });
+                  const [moviePreview, episodePreview] = await Promise.all([
+                    api.previewNaming('movie'),
+                    api.previewNaming('episode')
+                  ]);
+                  props.setNamingPreview({
+                    movie: moviePreview.preview,
+                    episode: episodePreview.preview
+                  });
+                } catch (error) {
+                  props.addToast({ type: 'error', message: 'Failed to save naming configuration' });
+                }
+              }}
+              moviePreview={props.namingPreview.movie}
+              episodePreview={props.namingPreview.episode}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Library Paths Sub-tab */}
+      {subTab === 'library' && (
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Movies Path</label>
+            <div className="flex items-stretch gap-2">
+              <Input type="text" value={props.moviePath} onChange={(e) => props.setMoviePath(e.target.value)} placeholder="/data/media/movies" className="dark:bg-gray-700 flex-1" />
+              <Button variant="secondary" onClick={() => props.setBrowsingFor('movie')} className="flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                Browse
+              </Button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">TV Shows Path</label>
+            <div className="flex items-stretch gap-2">
+              <Input type="text" value={props.tvPath} onChange={(e) => props.setTvPath(e.target.value)} placeholder="/data/media/tv" className="dark:bg-gray-700 flex-1" />
+              <Button variant="secondary" onClick={() => props.setBrowsingFor('tv')} className="flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                Browse
+              </Button>
+            </div>
+          </div>
+          <Button onClick={props.handleSavePaths}>Save Paths</Button>
+        </div>
+      )}
+
+      {/* Folder Browser Modal */}
+      {props.browsingFor && (
+        <FolderBrowser
+          currentPath={props.browsingFor === 'movie' ? props.moviePath : props.tvPath}
+          onSelect={(path) => {
+            if (props.browsingFor === 'movie') {
+              props.setMoviePath(path);
+            } else {
+              props.setTvPath(path);
+            }
+          }}
+          onClose={() => props.setBrowsingFor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function WorkersTab() {
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    loadWorkers();
+    // Refresh every 5 seconds
+    const interval = setInterval(loadWorkers, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadWorkers = async () => {
+    try {
+      const data = await api.getWorkers();
+      setWorkers(data);
+    } catch (error) {
+      console.error('Failed to load workers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStart = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await api.startWorker(id);
+      addToast({ type: 'success', message: 'Worker started' });
+      await loadWorkers();
+    } catch (error) {
+      addToast({ type: 'error', message: 'Failed to start worker' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleStop = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await api.stopWorker(id);
+      addToast({ type: 'success', message: 'Worker stopped' });
+      await loadWorkers();
+    } catch (error) {
+      addToast({ type: 'error', message: 'Failed to stop worker' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestart = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await api.restartWorker(id);
+      addToast({ type: 'success', message: 'Worker restarted' });
+      await loadWorkers();
+    } catch (error) {
+      addToast({ type: 'error', message: 'Failed to restart worker' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatInterval = (ms?: number) => {
+    if (!ms) return 'Manual';
+    if (ms < 60000) return `${ms / 1000}s`;
+    if (ms < 3600000) return `${ms / 60000}m`;
+    return `${ms / 3600000}h`;
+  };
+
+  const formatLastRun = (lastRun?: string) => {
+    if (!lastRun) return 'Never';
+    const date = new Date(lastRun);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return date.toLocaleString();
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+        Loading workers...
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Jobs</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Manage background tasks that run automatically</p>
+      </div>
+
+      {/* Workers List */}
+      <div className="space-y-4">
+        {workers.map((worker) => (
+          <div
+            key={worker.id}
+            className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">{worker.name}</h3>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    worker.status === 'running' 
+                      ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                      : worker.status === 'error'
+                      ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}>
+                    {worker.status === 'running' && (
+                      <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                    )}
+                    {worker.status.charAt(0).toUpperCase() + worker.status.slice(1)}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{worker.description}</p>
+                <div className="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <span>Interval: {formatInterval(worker.interval)}</span>
+                  <span>Last run: {formatLastRun(worker.lastRun)}</span>
+                </div>
+                {worker.errorMessage && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">Error: {worker.errorMessage}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                {worker.status === 'running' ? (
+                  <>
+                    <button
+                      onClick={() => handleStop(worker.id)}
+                      disabled={actionLoading === worker.id}
+                      className="px-3 py-1.5 text-sm bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50"
+                    >
+                      {actionLoading === worker.id ? 'Stopping...' : 'Stop'}
+                    </button>
+                    <button
+                      onClick={() => handleRestart(worker.id)}
+                      disabled={actionLoading === worker.id}
+                      className="px-3 py-1.5 text-sm bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/60 disabled:opacity-50"
+                    >
+                      {actionLoading === worker.id ? 'Restarting...' : 'Restart'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => handleStart(worker.id)}
+                    disabled={actionLoading === worker.id}
+                    className="px-3 py-1.5 text-sm bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/60 disabled:opacity-50"
+                  >
+                    {actionLoading === worker.id ? 'Starting...' : 'Start'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {workers.length === 0 && (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          No background workers configured
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SettingsPage() {
+  const { addToast, settings: toastSettings, updateSettings: updateToastSettings } = useToast();
+  const { settings: uiSettings, updateSettings: updateUISettings, currentTheme, saveCustomTheme, deleteCustomTheme } = useUISettings();
+  const [searchParams] = useSearchParams();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Read tab from URL parameter, default to 'ui'
+  const urlTab = searchParams.get('tab') as 'ui' | 'naming' | 'quality' | 'indexers' | 'downloads' | 'lists' | 'import' | 'api' | 'jobs' | null;
+  const [activeTab, setActiveTab] = useState<'ui' | 'naming' | 'quality' | 'indexers' | 'downloads' | 'lists' | 'import' | 'api' | 'jobs'>(urlTab || 'ui');
+
+  // Update tab when URL changes
+  useEffect(() => {
+    if (urlTab && ['ui', 'naming', 'quality', 'indexers', 'downloads', 'lists', 'import', 'api', 'jobs'].includes(urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
+
+  // Theme Editor
+  const [showThemeEditor, setShowThemeEditor] = useState(false);
+
+  // API Keys
+  const [tmdbApiKey, setTmdbApiKey] = useState('');
+  const [tvdbApiKey, setTvdbApiKey] = useState('');
+  const [testingTmdb, setTestingTmdb] = useState(false);
+  const [testingTvdb, setTestingTvdb] = useState(false);
+  const [tmdbTestResult, setTmdbTestResult] = useState<{ valid: boolean; message: string } | null>(null);
+  const [tvdbTestResult, setTvdbTestResult] = useState<{ valid: boolean; message: string } | null>(null);
+
+  // Media Paths
+  const [moviePath, setMoviePath] = useState('/data');
+  const [tvPath, setTvPath] = useState('/data');
+  const [browsingFor, setBrowsingFor] = useState<'movie' | 'tv' | null>(null);
+
+  // Indexers (for stats display)
+  const [indexers, setIndexers] = useState<any[]>([]);
+
+  // Quality Profiles
+  const [qualityProfiles, setQualityProfiles] = useState<QualityProfile[]>([]);
+  const [editingProfile, setEditingProfile] = useState<QualityProfile | null>(null);
+  const [showAddProfile, setShowAddProfile] = useState(false);
+  const [deleteProfileConfirm, setDeleteProfileConfirm] = useState<QualityProfile | null>(null);
+  const [showDeleteThemeConfirm, setShowDeleteThemeConfirm] = useState(false);
+
+  // Naming Configuration
+  const [namingConfig, setNamingConfig] = useState<NamingConfig | null>(null);
+  const [namingPreview, setNamingPreview] = useState<{ movie?: string; episode?: string }>({});
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [statsData, settingsData, indexersData, profilesData, namingData] = await Promise.all([
+        api.getLibraryStats(),
+        api.getSettings(),
+        api.getIndexers(),
+        api.getQualityProfiles().catch(() => []),
+        api.getNamingConfig().catch(() => null)
+      ]);
+      setStats(statsData);
+      setIndexers(indexersData || []);
+      setQualityProfiles(profilesData || []);
+      setNamingConfig(namingData);
+      
+      if (settingsData) {
+        setTmdbApiKey(settingsData.tmdb_api_key || '');
+        setTvdbApiKey(settingsData.tvdb_api_key || '');
+        setMoviePath(settingsData.movie_path || '/data/media/movies');
+        setTvPath(settingsData.tv_path || '/data/media/tv');
+      }
+
+      // Load naming preview
+      if (namingData) {
+        const [moviePreview, episodePreview] = await Promise.all([
+          api.previewNaming('movie').catch(() => ({ preview: '' })),
+          api.previewNaming('episode').catch(() => ({ preview: '' }))
+        ]);
+        setNamingPreview({
+          movie: moviePreview.preview,
+          episode: episodePreview.preview
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestTmdb = async () => {
+    if (!tmdbApiKey.trim()) {
+      addToast({ type: 'warning', message: 'Please enter an API key' });
+      return;
+    }
+    setTestingTmdb(true);
+    setTmdbTestResult(null);
+    try {
+      const result = await api.testTmdbKey(tmdbApiKey);
+      setTmdbTestResult(result);
+      if (result.valid) {
+        addToast({ type: 'success', message: result.message || 'TMDB API key is valid!' });
+      } else {
+        addToast({ type: 'error', message: result.message || 'Invalid API key' });
+      }
+    } catch (error: any) {
+      setTmdbTestResult({ valid: false, message: error.response?.data?.message || 'Test failed' });
+      addToast({ type: 'error', message: 'Failed to test API key' });
+    } finally {
+      setTestingTmdb(false);
+    }
+  };
+
+  const handleSaveTmdb = async () => {
+    if (!tmdbApiKey.trim()) {
+      addToast({ type: 'warning', message: 'Please enter an API key' });
+      return;
+    }
+    if (!tmdbTestResult?.valid) {
+      addToast({ type: 'warning', message: 'Please test the API key first' });
+      return;
+    }
+    setTestingTmdb(true);
+    try {
+      await api.updateSetting('tmdb_api_key', tmdbApiKey);
+      addToast({ type: 'success', message: 'TMDB API key saved!' });
+    } catch (error: any) {
+      addToast({ type: 'error', message: error.response?.data?.error || 'Failed to save API key' });
+    } finally {
+      setTestingTmdb(false);
+    }
+  };
+
+  const handleTestTvdb = async () => {
+    if (!tvdbApiKey.trim()) {
+      addToast({ type: 'warning', message: 'Please enter an API key' });
+      return;
+    }
+    setTestingTvdb(true);
+    setTvdbTestResult(null);
+    try {
+      const result = await api.testTvdbKey(tvdbApiKey);
+      setTvdbTestResult(result);
+      if (result.valid) {
+        addToast({ type: 'success', message: result.message || 'TVDB API key is valid!' });
+      } else {
+        addToast({ type: 'error', message: result.message || 'Invalid API key' });
+      }
+    } catch (error: any) {
+      setTvdbTestResult({ valid: false, message: error.response?.data?.message || 'Test failed' });
+      addToast({ type: 'error', message: 'Failed to test API key' });
+    } finally {
+      setTestingTvdb(false);
+    }
+  };
+
+  const handleSaveTvdb = async () => {
+    if (!tvdbApiKey.trim()) {
+      addToast({ type: 'warning', message: 'Please enter an API key' });
+      return;
+    }
+    if (!tvdbTestResult?.valid) {
+      addToast({ type: 'warning', message: 'Please test the API key first' });
+      return;
+    }
+    setTestingTvdb(true);
+    try {
+      await api.updateSetting('tvdb_api_key', tvdbApiKey);
+      addToast({ type: 'success', message: 'TVDB API key saved!' });
+    } catch (error: any) {
+      addToast({ type: 'error', message: error.response?.data?.error || 'Failed to save API key' });
+    } finally {
+      setTestingTvdb(false);
+    }
+  };
+
+  const handleSavePaths = async () => {
+    try {
+      await api.updateSetting('movie_path', moviePath);
+      await api.updateSetting('tv_path', tvPath);
+      addToast({ type: 'success', message: 'Media paths saved!' });
+    } catch (error: any) {
+      addToast({ type: 'error', message: error.response?.data?.error || 'Failed to save paths' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--theme-primary)' }}></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const tabs = [
+    { id: 'ui', label: 'UI Settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+    { id: 'naming', label: 'Media Management', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+    { id: 'quality', label: 'Quality Profiles', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { id: 'indexers', label: 'Indexers', icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' },
+    { id: 'downloads', label: 'Download Clients', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' },
+    { id: 'lists', label: 'Import Lists', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { id: 'import', label: 'Import', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
+    { id: 'api', label: 'API Keys', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
+    { id: 'jobs', label: 'Jobs', icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+  ];
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Configure MediaStack</p>
+        </div>
+
+        {/* Library Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.movies?.total || 0}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Movies</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.series?.total || 0}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">TV Shows</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats?.movies?.available || 0}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Available</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{indexers?.length || 0}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Indexers</p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <nav className="flex gap-4 -mb-px overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+                </svg>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+          
+          {/* Quality Profiles Tab */}
+          {activeTab === 'quality' && (
+            <div className="p-6">
+              {/* Header */}
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Quality Profiles</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Define quality preferences for downloads</p>
+              </div>
+
+              {/* Profile Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {qualityProfiles.map((profile) => (
+                  <div 
+                    key={profile.id}
+                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:border-primary-500 transition-colors group"
+                    onClick={() => setEditingProfile(profile)}
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded bg-primary-600 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <h3 className="font-medium text-gray-900 dark:text-white truncate">{profile.name}</h3>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteProfileConfirm(profile);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete profile"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                    {/* Card Body */}
+                    <div className="p-4">
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        Cutoff: <span className="font-medium text-gray-900 dark:text-white">{profile.cutoff_quality}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500 mb-3">
+                        {profile.upgrade_allowed ? '✓ Upgrades allowed' : '✗ No upgrades'}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {profile.items.filter(i => i.allowed).slice(0, 4).map((item, idx) => (
+                          <span key={idx} className={`px-2 py-0.5 text-xs rounded ${
+                            item.quality === profile.cutoff_quality 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          }`}>
+                            {item.quality}
+                          </span>
+                        ))}
+                        {profile.items.filter(i => i.allowed).length > 4 && (
+                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-500">
+                            +{profile.items.filter(i => i.allowed).length - 4}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add New Profile Card */}
+                <div 
+                  className="bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 p-4 flex items-center justify-center cursor-pointer hover:border-primary-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[160px]"
+                  onClick={() => setShowAddProfile(true)}
+                >
+                  <div className="text-center">
+                    <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center mx-auto mb-2">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Add Profile</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">How Quality Profiles Work</h4>
+                <ul className="text-sm text-blue-700 dark:text-blue-400 space-y-1">
+                  <li>• <strong>Allowed Qualities:</strong> Only these qualities will be downloaded</li>
+                  <li>• <strong>Cutoff:</strong> Once this quality is reached, no upgrades will occur</li>
+                  <li>• <strong>Upgrades:</strong> When enabled, better quality releases will replace existing files</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Quality Profile Editor Modal */}
+          {(editingProfile || showAddProfile) && (
+            <QualityProfileEditor
+              profile={editingProfile}
+              isNew={showAddProfile}
+              onSave={() => loadData()}
+              onClose={() => {
+                setEditingProfile(null);
+                setShowAddProfile(false);
+              }}
+            />
+          )}
+
+          {/* Quality Profile Delete Confirmation */}
+          <ConfirmModal
+            isOpen={!!deleteProfileConfirm}
+            title="Delete Quality Profile"
+            message={`Are you sure you want to delete "${deleteProfileConfirm?.name}"? This action cannot be undone.`}
+            confirmText="Delete"
+            onConfirm={async () => {
+              if (deleteProfileConfirm) {
+                try {
+                  await api.deleteQualityProfile(deleteProfileConfirm.id);
+                  addToast({ message: 'Quality profile deleted', type: 'success' });
+                  loadData();
+                } catch (error) {
+                  addToast({ message: 'Failed to delete profile', type: 'error' });
+                }
+              }
+              setDeleteProfileConfirm(null);
+            }}
+            onCancel={() => setDeleteProfileConfirm(null)}
+          />
+
+          {/* Media Management Tab with Sub-tabs */}
+          {activeTab === 'naming' && (
+            <MediaManagementTab 
+              namingConfig={namingConfig}
+              setNamingConfig={setNamingConfig}
+              namingPreview={namingPreview}
+              setNamingPreview={setNamingPreview}
+              moviePath={moviePath}
+              setMoviePath={setMoviePath}
+              tvPath={tvPath}
+              setTvPath={setTvPath}
+              browsingFor={browsingFor}
+              setBrowsingFor={setBrowsingFor}
+              handleSavePaths={handleSavePaths}
+              addToast={addToast}
+            />
+          )}
+
+          {/* Indexers Tab */}
+          {activeTab === 'indexers' && (
+            <div className="p-6">
+              <IndexersManager 
+                onToast={(message, type) => addToast({ type, message })}
+              />
+            </div>
+          )}
+
+          {/* Download Clients Tab */}
+          {activeTab === 'downloads' && (
+            <div className="p-6">
+              <DownloadClientsManager 
+                onToast={(message, type) => addToast({ type, message })}
+              />
+            </div>
+          )}
+
+          {/* Import Lists Tab */}
+          {activeTab === 'lists' && (
+            <div className="p-6">
+              <ImportListsSection 
+                onToast={(message, type) => addToast({ type, message })}
+              />
+            </div>
+          )}
+
+          {/* Import Tab */}
+          {activeTab === 'import' && (
+            <div className="p-6">
+              <ImportSection 
+                onToast={(message, type) => addToast({ type, message })}
+                initialMediaType={searchParams.get('type') === 'tv' ? 'tv' : searchParams.get('type') === 'movie' ? 'movie' : undefined}
+              />
+            </div>
+          )}
+
+          {/* API Keys Tab */}
+          {activeTab === 'api' && (
+            <div className="p-6 space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">API Keys</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Test your API key before saving. The test searches for "Stranger Things" to verify the connection.
+                </p>
+              </div>
+
+              {/* TMDB */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <label className="font-medium text-gray-900 dark:text-white block mb-2">
+                  TMDB API Key <span className="text-xs text-blue-600">(Movies & TV Search)</span>
+                </label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="password" 
+                    value={tmdbApiKey} 
+                    onChange={(e) => {
+                      setTmdbApiKey(e.target.value);
+                      setTmdbTestResult(null);
+                    }} 
+                    placeholder="Enter TMDB API key" 
+                    className="flex-1 dark:bg-gray-700" 
+                  />
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleTestTmdb} 
+                    disabled={testingTmdb || !tmdbApiKey.trim()}
+                  >
+                    {testingTmdb ? 'Testing...' : 'Test'}
+                  </Button>
+                  <Button 
+                    onClick={handleSaveTmdb} 
+                    disabled={testingTmdb || !tmdbTestResult?.valid}
+                    className={!tmdbTestResult?.valid ? 'opacity-50' : ''}
+                  >
+                    Save
+                  </Button>
+                </div>
+                {tmdbTestResult && (
+                  <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
+                    tmdbTestResult.valid 
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                  }`}>
+                    {tmdbTestResult.valid ? (
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    <span className="text-sm">{tmdbTestResult.message}</span>
+                  </div>
+                )}
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Get your API key from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">TMDB API Settings</a>
+                </p>
+              </div>
+
+              {/* TVDB */}
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <label className="font-medium text-gray-900 dark:text-white block mb-2">
+                  TVDB API Key <span className="text-xs text-purple-600">(TV Episode Data)</span>
+                </label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="password" 
+                    value={tvdbApiKey} 
+                    onChange={(e) => {
+                      setTvdbApiKey(e.target.value);
+                      setTvdbTestResult(null);
+                    }} 
+                    placeholder="Enter TVDB API key" 
+                    className="flex-1 dark:bg-gray-700" 
+                  />
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleTestTvdb} 
+                    disabled={testingTvdb || !tvdbApiKey.trim()}
+                  >
+                    {testingTvdb ? 'Testing...' : 'Test'}
+                  </Button>
+                  <Button 
+                    onClick={handleSaveTvdb} 
+                    disabled={testingTvdb || !tvdbTestResult?.valid}
+                    className={!tvdbTestResult?.valid ? 'opacity-50' : ''}
+                  >
+                    Save
+                  </Button>
+                </div>
+                {tvdbTestResult && (
+                  <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
+                    tvdbTestResult.valid 
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                  }`}>
+                    {tvdbTestResult.valid ? (
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    <span className="text-sm">{tvdbTestResult.message}</span>
+                  </div>
+                )}
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Get your API key from <a href="https://thetvdb.com/api-information" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">TVDB API Information</a>. 
+                  <span className="block mt-1 text-xs text-gray-500">Note: TVDB is used for episode data. TV show search uses TMDB for better English title support.</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* UI Settings Tab */}
+          {activeTab === 'ui' && (
+            <div className="p-6 space-y-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">UI Settings</h2>
+              
+              {/* Theme Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Theme</label>
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => setShowThemeEditor(true)}
+                    className="text-sm"
+                  >
+                    {uiSettings.customTheme ? 'Edit Custom Theme' : 'Create Custom Theme'}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {/* Custom Theme (if exists) */}
+                  {uiSettings.customTheme && (
+                    <div
+                      className={`relative group p-3 rounded-lg border-2 transition-all text-left cursor-pointer ${
+                        uiSettings.theme === 'custom'
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => updateUISettings({ theme: 'custom' })}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-1">
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: uiSettings.customTheme.navbarBg }}></div>
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: uiSettings.customTheme.background }}></div>
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: uiSettings.customTheme.cardBg }}></div>
+                        </div>
+                      </div>
+                      <p className="font-medium text-sm text-gray-900 dark:text-white">Custom Theme</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{uiSettings.customTheme.isDark ? 'Dark theme' : 'Light theme'}</p>
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteThemeConfirm(true);
+                        }}
+                        className="absolute top-1 right-1 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete custom theme"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Built-in Themes */}
+                  {themes.map((theme) => (
+                    <div
+                      key={theme.id}
+                      className={`relative group p-3 rounded-lg border-2 transition-all text-left cursor-pointer ${
+                        uiSettings.theme === theme.id
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => updateUISettings({ theme: theme.id })}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-1">
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: theme.navbarBg }}></div>
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: theme.background }}></div>
+                          <div className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600" style={{ background: theme.cardBg }}></div>
+                        </div>
+                      </div>
+                      <p className="font-medium text-sm text-gray-900 dark:text-white">{theme.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{theme.isDark ? 'Dark theme' : 'Light theme'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+
+              {/* Poster Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Poster Size: {uiSettings.posterSize}/10
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={uiSettings.posterSize}
+                  onChange={(e) => updateUISettings({ posterSize: Number(e.target.value) })}
+                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                />
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <span>Tiny</span>
+                  <span>Small</span>
+                  <span>Medium</span>
+                  <span>Large</span>
+                  <span>Huge</span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Adjusts poster size on Movies and TV Shows pages</p>
+              </div>
+
+              {/* Recently Added Widget */}
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={uiSettings.showRecentlyAdded}
+                    onChange={(e) => updateUISettings({ showRecentlyAdded: e.target.checked })}
+                    className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-primary-500 focus:ring-primary-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Show Recently Added on Dashboard</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Display recently added movies and TV shows on the dashboard</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Toast Settings */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Toast Notification Duration</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Default</label>
+                    <select value={toastSettings.defaultDuration / 1000} onChange={(e) => updateToastSettings({ defaultDuration: Number(e.target.value) * 1000 })} className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                      <option value="3">3 seconds</option>
+                      <option value="5">5 seconds</option>
+                      <option value="8">8 seconds</option>
+                      <option value="10">10 seconds</option>
+                      <option value="15">15 seconds</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Errors</label>
+                    <select value={toastSettings.errorDuration / 1000} onChange={(e) => updateToastSettings({ errorDuration: Number(e.target.value) * 1000 })} className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                      <option value="5">5 seconds</option>
+                      <option value="8">8 seconds</option>
+                      <option value="10">10 seconds</option>
+                      <option value="15">15 seconds</option>
+                      <option value="20">20 seconds</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Controls how long notification toasts stay visible.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Workers Tab */}
+          {activeTab === 'jobs' && (
+            <WorkersTab />
+          )}
+        </div>
+      </div>
+
+      {/* Custom Theme Delete Confirmation */}
+      <ConfirmModal
+        isOpen={showDeleteThemeConfirm}
+        title="Delete Custom Theme"
+        message="Are you sure you want to delete your custom theme? This action cannot be undone."
+        confirmText="Delete"
+        onConfirm={() => {
+          deleteCustomTheme();
+          setShowDeleteThemeConfirm(false);
+          addToast({ type: 'success', message: 'Custom theme deleted' });
+        }}
+        onCancel={() => setShowDeleteThemeConfirm(false)}
+      />
+
+      {/* Theme Editor Modal */}
+      {showThemeEditor && (
+        <ThemeEditor
+          currentTheme={currentTheme}
+          onSave={(theme) => {
+            saveCustomTheme(theme);
+            setShowThemeEditor(false);
+            addToast({ type: 'success', message: 'Custom theme saved!' });
+          }}
+          onCancel={() => setShowThemeEditor(false)}
+        />
+      )}
+    </Layout>
+  );
+}

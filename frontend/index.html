@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaStack - Unified Media Automation</title>
+    <script>
+      // Apply ALL theme variables BEFORE any rendering
+      (function() {
+        var themes = {
+          'dark': { isDark: true, background: 'oklch(0.15 0 0)', cardBg: 'oklch(0.22 0 0)', navbarBg: 'oklch(0.45 0.15 250)', hoverBg: 'oklch(0.3 0.08 250)', rowHoverBg: 'oklch(0.28 0.05 250)' },
+          'light': { isDark: false, background: 'oklch(0.97 0 0)', cardBg: 'oklch(1 0 0)', navbarBg: 'oklch(0.45 0.15 250)', hoverBg: 'oklch(0.92 0.02 250)', rowHoverBg: 'oklch(0.95 0.01 250)' },
+          'minimal': { isDark: true, background: 'oklch(0.14 0 0)', cardBg: 'oklch(0.2 0 0)', navbarBg: 'oklch(0.92 0 0)', hoverBg: 'oklch(0.27 0 0)', rowHoverBg: 'oklch(0.37 0 0)' },
+          'autobrr': { isDark: true, background: 'oklch(0.21 0.01 285.89)', cardBg: 'oklch(0.27 0.01 286.03)', navbarBg: 'oklch(0.62 0.19 259.81)', hoverBg: 'oklch(0.37 0.01 285.81)', rowHoverBg: 'oklch(0.37 0.03 259.73)' },
+          'napster': { isDark: false, background: 'oklch(0.78 0 0)', cardBg: 'oklch(1 0 0)', navbarBg: 'oklch(0.3 0.14 265.14)', hoverBg: 'oklch(0.78 0 0)', rowHoverBg: 'oklch(0.82 0.17 99.27)' },
+          'nightwalker': { isDark: true, background: 'oklch(0.31 0.02 262.24)', cardBg: 'oklch(0.35 0.02 262.59)', navbarBg: 'oklch(0.62 0.19 259.81)', hoverBg: 'oklch(0.41 0.04 254.55)', rowHoverBg: 'oklch(0.41 0.04 254.55)' },
+          'swizzin': { isDark: true, background: 'oklch(0.25 0 0)', cardBg: 'oklch(0.31 0 0)', navbarBg: 'oklch(0.71 0.15 166.57)', hoverBg: 'oklch(0.46 0.07 250.95)', rowHoverBg: 'oklch(0.39 0 0)' },
+          'thekyle': { isDark: true, background: 'oklch(0.21 0.02 248.83)', cardBg: 'oklch(0.25 0.08 282.88)', navbarBg: 'oklch(0.54 0.23 351.56)', hoverBg: 'oklch(0.72 0.13 223.94)', rowHoverBg: 'oklch(0.38 0.16 351.45)' },
+          'amber': { isDark: true, background: 'oklch(0.2 0 0)', cardBg: 'oklch(0.27 0 0)', navbarBg: 'oklch(0.64 0.13 73.98)', hoverBg: 'oklch(0.27 0 0)', rowHoverBg: 'oklch(0.47 0.12 46.2)' },
+          'amethyst': { isDark: true, background: 'oklch(0.22 0.02 292.85)', cardBg: 'oklch(0.25 0.03 292.73)', navbarBg: 'oklch(0.71 0.08 302.05)', hoverBg: 'oklch(0.46 0.05 295.56)', rowHoverBg: 'oklch(0.32 0.03 308.61)' },
+          'bubblegum': { isDark: true, background: 'oklch(0.25 0.03 234.16)', cardBg: 'oklch(0.29 0.03 233.54)', navbarBg: 'oklch(0.92 0.08 87.67)', hoverBg: 'oklch(0.78 0.08 4.13)', rowHoverBg: 'oklch(0.67 0.1 356.98)' },
+          'catppuccin': { isDark: true, background: 'oklch(0.22 0.03 284.06)', cardBg: 'oklch(0.24 0.03 283.91)', navbarBg: 'oklch(0.22 0.03 284.06)', hoverBg: 'oklch(0.48 0.03 278.64)', rowHoverBg: 'oklch(0.32 0.03 281.98)' },
+          'claude': { isDark: true, background: 'oklch(0.27 0 106.64)', cardBg: 'oklch(0.25 0 106.53)', navbarBg: 'oklch(0.67 0.13 38.76)', hoverBg: 'oklch(0.98 0.01 95.1)', rowHoverBg: 'oklch(0.21 0.01 95.42)' },
+          'cyberpunk': { isDark: true, background: 'oklch(0.16 0.04 281.83)', cardBg: 'oklch(0.25 0.06 281.14)', navbarBg: 'oklch(0.67 0.29 341.41)', hoverBg: 'oklch(0.25 0.06 281.14)', rowHoverBg: 'oklch(0.57 0.12 165.75)' },
+          'kitsune': { isDark: true, background: 'oklch(0 0 0)', cardBg: 'oklch(0.13 0.01 285)', navbarBg: 'oklch(0.78 0.1 350.12)', hoverBg: 'oklch(0.18 0.01 285.33)', rowHoverBg: 'oklch(0.22 0.04 349.62)' },
+          'nord': { isDark: true, background: 'oklch(0.32 0.02 264.18)', cardBg: 'oklch(0.38 0.03 266.47)', navbarBg: 'oklch(0.77 0.06 217.47)', hoverBg: 'oklch(0.76 0.05 194.49)', rowHoverBg: 'oklch(0.59 0.08 254.03)' },
+          'perpetuity': { isDark: true, background: 'oklch(0.21 0.02 224.45)', cardBg: 'oklch(0.23 0.03 216.07)', navbarBg: 'oklch(0.85 0.13 195.04)', hoverBg: 'oklch(0.38 0.06 216.5)', rowHoverBg: 'oklch(0.38 0.06 216.5)' },
+          'synthwave': { isDark: true, background: 'oklch(0.19 0.07 304.57)', cardBg: 'oklch(0.22 0.08 303.76)', navbarBg: 'oklch(0.75 0.18 346.81)', hoverBg: 'oklch(0.34 0.14 305.57)', rowHoverBg: 'oklch(0.31 0.11 303.32)' },
+          'tangerine': { isDark: true, background: 'oklch(0.26 0.03 262.67)', cardBg: 'oklch(0.31 0.03 268.64)', navbarBg: 'oklch(0.64 0.17 36.44)', hoverBg: 'oklch(0.31 0.03 266.71)', rowHoverBg: 'oklch(0.34 0.06 267.59)' },
+          'matrix': { isDark: true, background: 'oklch(0.11 0.01 165.27)', cardBg: 'oklch(0.17 0.03 154.3)', navbarBg: 'oklch(0.87 0.29 141.53)', hoverBg: 'oklch(0.31 0.08 149.18)', rowHoverBg: 'oklch(0.25 0.05 155.17)' }
+        };
+        
+        try {
+          var stored = localStorage.getItem('ui_settings');
+          var themeId = 'dark';
+          if (stored) {
+            var settings = JSON.parse(stored);
+            themeId = settings.theme || 'dark';
+          }
+          
+          var t = themes[themeId] || themes['dark'];
+          var r = document.documentElement;
+          var isDark = t.isDark;
+          
+          // Text colors
+          var textPrimary = isDark ? 'oklch(0.95 0 0)' : 'oklch(0.15 0 0)';
+          var textSecondary = isDark ? 'oklch(0.7 0 0)' : 'oklch(0.4 0 0)';
+          var textMuted = isDark ? 'oklch(0.55 0 0)' : 'oklch(0.5 0 0)';
+          var navbarText = 'oklch(0.95 0 0)';
+          var btnPrimaryText = isDark ? 'oklch(0.1 0 0)' : 'oklch(0.95 0 0)';
+          
+          // BASE COLORS
+          r.style.setProperty('--page-bg', t.background);
+          r.style.setProperty('--card-bg', t.cardBg);
+          r.style.setProperty('--navbar-bg', t.navbarBg);
+          r.style.setProperty('--hover-bg', t.hoverBg);
+          r.style.setProperty('--row-hover-bg', t.rowHoverBg);
+          
+          // NAVBAR
+          r.style.setProperty('--navbar-text', navbarText);
+          r.style.setProperty('--navbar-hover', t.hoverBg);
+          r.style.setProperty('--navbar-active', t.hoverBg);
+          r.style.setProperty('--navbar-border', t.hoverBg);
+          r.style.setProperty('--navbar-brand', navbarText);
+          
+          // BUTTONS - PRIMARY
+          r.style.setProperty('--btn-primary-bg', t.navbarBg);
+          r.style.setProperty('--btn-primary-text', btnPrimaryText);
+          r.style.setProperty('--btn-primary-hover', t.hoverBg);
+          r.style.setProperty('--btn-primary-border', t.navbarBg);
+          r.style.setProperty('--btn-primary-focus', t.navbarBg);
+          
+          // BUTTONS - SECONDARY
+          r.style.setProperty('--btn-secondary-bg', t.cardBg);
+          r.style.setProperty('--btn-secondary-text', textPrimary);
+          r.style.setProperty('--btn-secondary-hover', t.rowHoverBg);
+          r.style.setProperty('--btn-secondary-border', t.hoverBg);
+          r.style.setProperty('--btn-secondary-focus', t.hoverBg);
+          
+          // BUTTONS - DANGER
+          r.style.setProperty('--btn-danger-bg', 'oklch(0.55 0.2 25)');
+          r.style.setProperty('--btn-danger-text', 'oklch(0.95 0 0)');
+          r.style.setProperty('--btn-danger-hover', 'oklch(0.45 0.2 25)');
+          r.style.setProperty('--btn-danger-border', 'oklch(0.55 0.2 25)');
+          r.style.setProperty('--btn-danger-focus', 'oklch(0.55 0.2 25)');
+          
+          // TEXT
+          r.style.setProperty('--text-primary', textPrimary);
+          r.style.setProperty('--text-secondary', textSecondary);
+          r.style.setProperty('--text-muted', textMuted);
+          r.style.setProperty('--text-link', t.navbarBg);
+          r.style.setProperty('--text-link-hover', t.hoverBg);
+          
+          // HEADINGS
+          r.style.setProperty('--heading-text', textPrimary);
+          r.style.setProperty('--card-title', textPrimary);
+          
+          // BORDERS
+          r.style.setProperty('--border-color', t.hoverBg);
+          r.style.setProperty('--border-light', isDark ? 'oklch(0.35 0 0)' : 'oklch(0.85 0 0)');
+          r.style.setProperty('--border-focus', t.navbarBg);
+          
+          // CARDS & SURFACES
+          r.style.setProperty('--surface-bg', t.cardBg);
+          r.style.setProperty('--surface-hover', t.rowHoverBg);
+          r.style.setProperty('--surface-border', t.hoverBg);
+          r.style.setProperty('--card-border', t.hoverBg);
+          r.style.setProperty('--card-shadow', isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.1)');
+          
+          // INPUTS
+          r.style.setProperty('--input-bg', t.background);
+          r.style.setProperty('--input-text', textPrimary);
+          r.style.setProperty('--input-placeholder', textMuted);
+          r.style.setProperty('--input-border', t.hoverBg);
+          r.style.setProperty('--input-focus-border', t.navbarBg);
+          r.style.setProperty('--input-focus-ring', t.navbarBg);
+          
+          // TABLES
+          r.style.setProperty('--table-bg', t.cardBg);
+          r.style.setProperty('--table-header-bg', t.background);
+          r.style.setProperty('--table-row-hover', t.rowHoverBg);
+          r.style.setProperty('--table-border', t.hoverBg);
+          r.style.setProperty('--table-text', textPrimary);
+          
+          // MODALS
+          r.style.setProperty('--modal-bg', t.cardBg);
+          r.style.setProperty('--modal-overlay', isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.5)');
+          r.style.setProperty('--modal-border', t.hoverBg);
+          
+          // DROPDOWNS
+          r.style.setProperty('--dropdown-bg', t.cardBg);
+          r.style.setProperty('--dropdown-hover', t.rowHoverBg);
+          r.style.setProperty('--dropdown-border', t.hoverBg);
+          r.style.setProperty('--dropdown-text', textPrimary);
+          
+          // SELECTION
+          r.style.setProperty('--selected-bg', t.navbarBg);
+          r.style.setProperty('--selected-text', btnPrimaryText);
+          r.style.setProperty('--active-bg', t.hoverBg);
+          r.style.setProperty('--focus-ring', t.navbarBg);
+          
+          // SCROLLBAR
+          r.style.setProperty('--scrollbar-track', t.background);
+          r.style.setProperty('--scrollbar-thumb', t.hoverBg);
+          r.style.setProperty('--scrollbar-thumb-hover', t.rowHoverBg);
+          
+          // BADGES
+          r.style.setProperty('--badge-bg', t.hoverBg);
+          r.style.setProperty('--badge-text', navbarText);
+          
+          // TOOLTIPS
+          r.style.setProperty('--tooltip-bg', isDark ? 'oklch(0.9 0 0)' : 'oklch(0.2 0 0)');
+          r.style.setProperty('--tooltip-text', isDark ? 'oklch(0.1 0 0)' : 'oklch(0.95 0 0)');
+          
+          // LOADING
+          r.style.setProperty('--spinner-color', t.navbarBg);
+          r.style.setProperty('--skeleton-bg', t.hoverBg);
+          
+          // PROGRESS
+          r.style.setProperty('--progress-bg', t.hoverBg);
+          r.style.setProperty('--progress-fill', t.navbarBg);
+          
+          // TABS
+          r.style.setProperty('--tab-bg', t.cardBg);
+          r.style.setProperty('--tab-active-bg', t.navbarBg);
+          r.style.setProperty('--tab-active-text', btnPrimaryText);
+          r.style.setProperty('--tab-hover', t.rowHoverBg);
+          r.style.setProperty('--tab-text', textPrimary);
+          r.style.setProperty('--tab-border', t.hoverBg);
+          
+          // TOGGLE
+          r.style.setProperty('--toggle-bg', t.hoverBg);
+          r.style.setProperty('--toggle-active-bg', t.navbarBg);
+          r.style.setProperty('--toggle-thumb', 'oklch(0.95 0 0)');
+          
+          // MODE CLASS
+          if (isDark) {
+            r.classList.add('dark');
+          } else {
+            r.classList.add('light');
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+        
+        document.documentElement.classList.add('theme-ready');
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
