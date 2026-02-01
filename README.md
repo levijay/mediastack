@@ -33,12 +33,6 @@ MediaStack combines the functionality of Radarr, Sonarr, and Overseerr into a si
 - **Manual Import** - Import existing media with proper naming
 - **Blacklisting** - Block unwanted releases
 
-### 👥 User Management
-- **Multi-user Support** - Admin, Approver, and User roles
-- **Request System** - Users can request movies and TV shows
-- **Approval Workflow** - Approvers review and approve requests
-- **API Keys** - Generate keys for external integrations
-
 ### 🔔 Notifications
 - **Multiple Services** - Discord, Telegram, Email, Pushover, Slack, Gotify, Webhook
 - **Event Triggers** - Grab, download, import, upgrade, health issues
