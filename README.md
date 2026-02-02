@@ -33,6 +33,12 @@ MediaStack combines the functionality of Radarr, Sonarr, and Overseerr into a si
 - **Manual Import** - Import existing media with proper naming
 - **Blacklisting** - Block unwanted releases
 
+### 👥 User Management
+- **Multi-user Support** - Admin, Approver, and User roles
+- **Request System** - Users can request movies and TV shows
+- **Approval Workflow** - Approvers review and approve requests
+- **API Keys** - Generate keys for external integrations
+
 ### 🔔 Notifications
 - **Multiple Services** - Discord, Telegram, Email, Pushover, Slack, Gotify, Webhook
 - **Event Triggers** - Grab, download, import, upgrade, health issues
@@ -171,6 +177,15 @@ curl -H "X-Api-Key: your-api-key" http://localhost:6767/api/movies
 - `GET /api/system/status` - System status
 - `GET /api/system/health` - Health check
 
+## Browser Extension & Mobile App
+
+MediaStack includes companion apps for easy media discovery:
+
+- **Chrome/Edge Extension** - Add movies/shows while browsing TMDB, IMDb, Trakt
+- **Android App** - Manage your library on the go
+
+See the `/apps` directory for installation instructions.
+
 ## Troubleshooting
 
 ### Cannot access web interface
@@ -253,10 +268,3 @@ Inspired by the excellent work of:
 - ✅ Improved search matching (article handling, year tolerance)
 - ✅ Background workers process full library
 - ✅ Mobile-responsive UI improvements
-
-<img width="1780" height="1160" alt="image" src="https://github.com/user-attachments/assets/d242b603-4bba-41cd-9f99-a75eab8a695e" />
-<img width="1790" height="1186" alt="image" src="https://github.com/user-attachments/assets/0714b57a-f7ff-46b6-afe3-e66ee09d0116" />
-<img width="1785" height="995" alt="image" src="https://github.com/user-attachments/assets/774318ea-1e07-4bb9-826a-8ccd821837e6" />
-<img width="1777" height="1268" alt="image" src="https://github.com/user-attachments/assets/c8700995-ac51-4783-9bae-350571cb0dea" />
-
-

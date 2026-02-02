@@ -345,6 +345,23 @@ class IndexerService {
         }
         logger_1.default.debug(`[SEARCH] Title matching: "${searchTitle}" -> content: [${contentWords.join(', ')}], articles: [${articleWords.join(', ')}]${expectedYear ? `, year: ${expectedYear}` : ''}`);
         return results.filter(result => {
+            // CRITICAL: For movie searches, reject releases with TV show patterns
+            if (mediaType === 'movie') {
+                const tvPatterns = [
+                    /\bS\d{1,2}E\d{1,2}\b/i, // S01E01
+                    /\bS\d{1,2}\s*E\d{1,2}\b/i, // S01 E01
+                    /\b\d{1,2}x\d{1,2}\b/, // 1x01
+                    /\bSeason\s*\d+/i, // Season 1
+                    /\bEpisode\s*\d+/i, // Episode 1
+                    /\bComplete\s*Series/i, // Complete Series
+                ];
+                for (const pattern of tvPatterns) {
+                    if (pattern.test(result.title)) {
+                        logger_1.default.debug(`[SEARCH] Filtered (TV pattern in movie search): ${result.title}`);
+                        return false;
+                    }
+                }
+            }
             // Check category - Movies: 2000-2999, TV: 5000-5999
             if (result.categories && result.categories.length > 0) {
                 const hasMovieCategory = result.categories.some(cat => cat.toLowerCase().includes('movie') ||
@@ -370,6 +387,11 @@ class IndexerService {
                         return false;
                     }
                 }
+                // For upcoming/unreleased movies (current year or later), require a year in the release
+                else if (expectedYear >= new Date().getFullYear()) {
+                    logger_1.default.debug(`[SEARCH] Filtered (no year in release for upcoming movie ${expectedYear}): ${result.title}`);
+                    return false;
+                }
             }
             // Extract title from release name (before year/quality info)
             const releaseTitle = this.extractTitleFromRelease(result.title);
@@ -379,14 +401,25 @@ class IndexerService {
             const matchedContentWords = contentWords.filter(searchWord => releaseWords.some(releaseWord => releaseWord === searchWord));
             // Calculate how many CONTENT words matched (articles are optional)
             const contentMatchRatio = matchedContentWords.length / contentWords.length;
+            // CRITICAL: Check that the expected title appears at the START of the release
+            // The first content word of expected should be within the first few words of release
+            // This prevents "He-Man and the Masters of the Universe" matching "Masters of the Universe"
+            const firstContentWord = contentWords[0];
+            const firstContentIdx = releaseWords.indexOf(firstContentWord);
+            // First content word must be found and within first 3 positions (indices 0, 1, 2)
+            // This prevents "He-Man and the Masters of the Universe" matching "Masters of the Universe"
+            if (firstContentIdx < 0 || firstContentIdx > 2) {
+                logger_1.default.debug(`[SEARCH] Filtered (title doesn't start with expected - first word "${firstContentWord}" at position ${firstContentIdx}): "${releaseTitle}" for "${searchTitle}"`);
+                return false;
+            }
             // Calculate extra words in release that aren't in search
             // This prevents "Pacific Rim Uprising" matching "Rising"
             const unmatchedReleaseWords = releaseWords.filter(rw => !allSearchWords.some(sw => sw === rw));
             // Requirements:
             // 1. At least 80% of CONTENT words must match exactly
-            // 2. Release can't have more than 2x unmatched words vs matched content words
+            // 2. Release can't have more extra words than content words (stricter limit)
             const requiredRatio = 0.8;
-            const maxExtraWords = Math.max(2, matchedContentWords.length * 2);
+            const maxExtraWords = Math.max(2, contentWords.length);
             if (contentMatchRatio < requiredRatio) {
                 logger_1.default.debug(`[SEARCH] Filtered (${Math.round(contentMatchRatio * 100)}% content match, need ${Math.round(requiredRatio * 100)}%): "${releaseTitle}" for "${searchTitle}"`);
                 return false;

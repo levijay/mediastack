@@ -467,8 +467,26 @@ class RssSyncService {
                 .replace(/\s+/g, ' ')
                 .trim();
         };
-        // Extract title from release (before year/quality)
+        // Convert dots/underscores to spaces for easier parsing
         let extractedTitle = releaseTitle.replace(/[._]/g, ' ');
+        // CRITICAL: Check if this is a TV episode (S##E## or Season ## Episode ##)
+        // If we're matching for a movie (year provided), reject TV patterns
+        if (expectedYear !== undefined) {
+            const tvPatterns = [
+                /\bS\d{1,2}E\d{1,2}\b/i, // S01E01
+                /\bS\d{1,2}\s*E\d{1,2}\b/i, // S01 E01
+                /\b\d{1,2}x\d{1,2}\b/, // 1x01
+                /\bSeason\s*\d+\s*Episode\s*\d+/i, // Season 1 Episode 1
+                /\bComplete\s*Season/i, // Complete Season
+                /\bSeason\s*\d+\s*Complete/i, // Season 1 Complete
+            ];
+            for (const pattern of tvPatterns) {
+                if (pattern.test(releaseTitle)) {
+                    return false; // This is a TV show, not a movie
+                }
+            }
+        }
+        // Extract title from release (before year/quality)
         const splitPatterns = [
             /\s+(19|20)\d{2}\s/,
             /\s+S\d{2}/i,
@@ -493,19 +511,35 @@ class RssSyncService {
         const matchRatio = matchedWords.length / expectedWords.length;
         if (matchRatio < 0.8)
             return false;
-        // Check year if provided
+        // STRICT: Check that the expected title appears near the START of the release title
+        // Don't allow "He-Man and the Masters of the Universe" to match "Masters of the Universe"
+        // The first content word of expected should appear within the first 3 words of release
+        const firstExpectedWord = expectedWords[0];
+        const firstExpectedIdx = releaseWords.indexOf(firstExpectedWord);
+        // First content word must be found and within first 3 positions (indices 0, 1, 2)
+        if (firstExpectedIdx < 0 || firstExpectedIdx > 2) {
+            return false;
+        }
+        // Check year if provided (for movies)
         if (expectedYear) {
             const yearMatch = releaseTitle.match(/\b(19|20)\d{2}\b/);
             if (yearMatch) {
                 const releaseYear = parseInt(yearMatch[0]);
+                // Allow 1 year tolerance for edge cases (December release in next year, etc.)
                 if (Math.abs(releaseYear - expectedYear) > 1) {
                     return false;
                 }
             }
+            // If no year found and we're expecting 2024+ (unreleased/upcoming movie), be cautious
+            // Don't auto-match releases without years for future movies
+            else if (expectedYear >= new Date().getFullYear()) {
+                return false;
+            }
         }
-        // Check extra words limit
+        // Check extra words limit - be stricter
         const unmatchedReleaseWords = releaseWords.filter(rw => !expectedWords.some(ew => ew === rw));
-        const maxExtraWords = Math.max(2, matchedWords.length * 2);
+        // Allow fewer extra words - max 2 or half the matched words
+        const maxExtraWords = Math.max(2, Math.floor(matchedWords.length * 0.5));
         if (unmatchedReleaseWords.length > maxExtraWords) {
             return false;
         }
