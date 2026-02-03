@@ -34,6 +34,13 @@ export class AutoSearchService {
         return null;
       }
 
+      // CRITICAL: Check if there's already an active download for this movie
+      const activeDownload = DownloadModel.findActiveByMovieId(movieId);
+      if (activeDownload) {
+        logger.info(`Movie ${movie.title} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+        return null;
+      }
+
       // Get quality profile
       const profileStmt = db.prepare('SELECT * FROM quality_profiles WHERE id = ?');
       const profile = profileStmt.get(movie.quality_profile_id) as any;
@@ -206,6 +213,13 @@ export class AutoSearchService {
 
       if (!episode) {
         logger.error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
+        return null;
+      }
+
+      // CRITICAL: Check if there's already an active download for this episode
+      const activeDownload = DownloadModel.findActiveByEpisode(seriesId, seasonNumber, episodeNumber);
+      if (activeDownload) {
+        logger.info(`Episode ${series.title} S${seasonNumber}E${episodeNumber} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
         return null;
       }
 

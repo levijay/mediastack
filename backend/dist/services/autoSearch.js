@@ -26,6 +26,12 @@ class AutoSearchService {
                 logger_1.default.error(`Movie not found: ${movieId}`);
                 return null;
             }
+            // CRITICAL: Check if there's already an active download for this movie
+            const activeDownload = Download_1.DownloadModel.findActiveByMovieId(movieId);
+            if (activeDownload) {
+                logger_1.default.info(`Movie ${movie.title} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+                return null;
+            }
             // Get quality profile
             const profileStmt = database_1.default.prepare('SELECT * FROM quality_profiles WHERE id = ?');
             const profile = profileStmt.get(movie.quality_profile_id);
@@ -166,6 +172,12 @@ class AutoSearchService {
             const episode = TVSeries_1.TVSeriesModel.findEpisodesBySeason(seriesId, seasonNumber).find((e) => e.episode_number === episodeNumber);
             if (!episode) {
                 logger_1.default.error(`Episode not found: S${seasonNumber}E${episodeNumber}`);
+                return null;
+            }
+            // CRITICAL: Check if there's already an active download for this episode
+            const activeDownload = Download_1.DownloadModel.findActiveByEpisode(seriesId, seasonNumber, episodeNumber);
+            if (activeDownload) {
+                logger_1.default.info(`Episode ${series.title} S${seasonNumber}E${episodeNumber} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
                 return null;
             }
             // Get quality profile

@@ -158,6 +158,18 @@ class RssSyncService {
                     logger_1.default.debug(`[RSS] Custom format score ${cfScore} below minimum ${minCfScore} for ${movie.title}`);
                     continue;
                 }
+                // CRITICAL: Check if there's already an active download for this movie
+                const activeDownload = Download_1.DownloadModel.findActiveByMovieId(movie.id);
+                if (activeDownload) {
+                    logger_1.default.debug(`[RSS] Movie "${movie.title}" already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+                    continue;
+                }
+                // Also check if this exact release URL is already being downloaded
+                const existingRelease = Download_1.DownloadModel.findByDownloadUrl(release.downloadUrl);
+                if (existingRelease) {
+                    logger_1.default.debug(`[RSS] Release already downloading: ${release.title}`);
+                    continue;
+                }
                 // Grab the release directly!
                 const action = movie.has_file ? 'Upgrading' : 'Grabbing';
                 logger_1.default.info(`[RSS] ${action} release for movie "${movie.title}": ${release.title}`);
@@ -244,6 +256,18 @@ class RssSyncService {
                     logger_1.default.debug(`[RSS] Custom format score ${cfScore} below minimum ${minCfScore}`);
                     continue;
                 }
+                // CRITICAL: Check if there's already an active download for this episode
+                const activeDownload = Download_1.DownloadModel.findActiveByEpisode(ep.series_id, ep.season_number, ep.episode_number);
+                if (activeDownload) {
+                    logger_1.default.debug(`[RSS] Episode "${ep.series_title}" S${ep.season_number}E${ep.episode_number} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+                    continue;
+                }
+                // Also check if this exact release URL is already being downloaded
+                const existingRelease = Download_1.DownloadModel.findByDownloadUrl(release.downloadUrl);
+                if (existingRelease) {
+                    logger_1.default.debug(`[RSS] Release already downloading: ${release.title}`);
+                    continue;
+                }
                 // Grab the release directly!
                 const action = ep.has_file ? 'Upgrading' : 'Grabbing';
                 logger_1.default.info(`[RSS] ${action} release for "${ep.series_title}" S${ep.season_number}E${ep.episode_number}`);
@@ -281,6 +305,24 @@ class RssSyncService {
                 const quality = this.detectQuality(release.title);
                 if (!QualityProfile_1.QualityProfileModel.meetsProfile(series.quality_profile_id, quality)) {
                     logger_1.default.debug(`[RSS] Quality ${quality} not allowed for season pack`);
+                    continue;
+                }
+                // CRITICAL: Check if there's already an active download for this season
+                // Check if any episode in this season already has an active download
+                const activeSeasonDownload = database_1.default.prepare(`
+          SELECT * FROM downloads 
+          WHERE series_id = ? AND season_number = ?
+          AND status IN ('queued', 'downloading', 'importing')
+          LIMIT 1
+        `).get(series.id, seasonNumber);
+                if (activeSeasonDownload) {
+                    logger_1.default.debug(`[RSS] Season pack "${series.title}" S${seasonNumber} already has an active download`);
+                    continue;
+                }
+                // Also check if this exact release URL is already being downloaded
+                const existingRelease = Download_1.DownloadModel.findByDownloadUrl(release.downloadUrl);
+                if (existingRelease) {
+                    logger_1.default.debug(`[RSS] Release already downloading: ${release.title}`);
                     continue;
                 }
                 // Grab season pack

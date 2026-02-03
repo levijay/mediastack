@@ -245,6 +245,20 @@ export class RssSyncService {
           continue;
         }
 
+        // CRITICAL: Check if there's already an active download for this movie
+        const activeDownload = DownloadModel.findActiveByMovieId(movie.id);
+        if (activeDownload) {
+          logger.debug(`[RSS] Movie "${movie.title}" already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+          continue;
+        }
+
+        // Also check if this exact release URL is already being downloaded
+        const existingRelease = DownloadModel.findByDownloadUrl(release.downloadUrl);
+        if (existingRelease) {
+          logger.debug(`[RSS] Release already downloading: ${release.title}`);
+          continue;
+        }
+
         // Grab the release directly!
         const action = movie.has_file ? 'Upgrading' : 'Grabbing';
         logger.info(`[RSS] ${action} release for movie "${movie.title}": ${release.title}`);
@@ -348,6 +362,20 @@ export class RssSyncService {
           continue;
         }
 
+        // CRITICAL: Check if there's already an active download for this episode
+        const activeDownload = DownloadModel.findActiveByEpisode(ep.series_id, ep.season_number, ep.episode_number);
+        if (activeDownload) {
+          logger.debug(`[RSS] Episode "${ep.series_title}" S${ep.season_number}E${ep.episode_number} already has an active download: ${activeDownload.title} (${activeDownload.status})`);
+          continue;
+        }
+
+        // Also check if this exact release URL is already being downloaded
+        const existingRelease = DownloadModel.findByDownloadUrl(release.downloadUrl);
+        if (existingRelease) {
+          logger.debug(`[RSS] Release already downloading: ${release.title}`);
+          continue;
+        }
+
         // Grab the release directly!
         const action = ep.has_file ? 'Upgrading' : 'Grabbing';
         logger.info(`[RSS] ${action} release for "${ep.series_title}" S${ep.season_number}E${ep.episode_number}`);
@@ -396,6 +424,26 @@ export class RssSyncService {
         const quality = this.detectQuality(release.title);
         if (!QualityProfileModel.meetsProfile(series.quality_profile_id, quality)) {
           logger.debug(`[RSS] Quality ${quality} not allowed for season pack`);
+          continue;
+        }
+
+        // CRITICAL: Check if there's already an active download for this season
+        // Check if any episode in this season already has an active download
+        const activeSeasonDownload = db.prepare(`
+          SELECT * FROM downloads 
+          WHERE series_id = ? AND season_number = ?
+          AND status IN ('queued', 'downloading', 'importing')
+          LIMIT 1
+        `).get(series.id, seasonNumber);
+        if (activeSeasonDownload) {
+          logger.debug(`[RSS] Season pack "${series.title}" S${seasonNumber} already has an active download`);
+          continue;
+        }
+
+        // Also check if this exact release URL is already being downloaded
+        const existingRelease = DownloadModel.findByDownloadUrl(release.downloadUrl);
+        if (existingRelease) {
+          logger.debug(`[RSS] Release already downloading: ${release.title}`);
           continue;
         }
 
