@@ -662,16 +662,18 @@ export class RssSyncService {
     // Convert dots/underscores to spaces for easier parsing
     let extractedTitle = releaseTitle.replace(/[._]/g, ' ');
     
-    // CRITICAL: Check if this is a TV episode (S##E## or Season ## Episode ##)
+    // CRITICAL: Check if this is a TV episode/season (S##E## or S## or Season ##)
     // If we're matching for a movie (year provided), reject TV patterns
     if (expectedYear !== undefined) {
       const tvPatterns = [
         /\bS\d{1,2}E\d{1,2}\b/i,           // S01E01
         /\bS\d{1,2}\s*E\d{1,2}\b/i,         // S01 E01
+        /\bS\d{1,2}\b(?!\d)/i,              // S01 alone (season pack) - not followed by more digits
         /\b\d{1,2}x\d{1,2}\b/,               // 1x01
-        /\bSeason\s*\d+\s*Episode\s*\d+/i,   // Season 1 Episode 1
-        /\bComplete\s*Season/i,              // Complete Season
-        /\bSeason\s*\d+\s*Complete/i,        // Season 1 Complete
+        /\bSeason\s*\d+/i,                   // Season 1 (with or without episode)
+        /\bEpisode\s*\d+/i,                  // Episode 1
+        /\bComplete\s*Series/i,              // Complete Series
+        /\bMini[\s-]*Series/i,               // Mini-Series / Miniseries
       ];
       
       for (const pattern of tvPatterns) {
@@ -715,13 +717,21 @@ export class RssSyncService {
 
     // STRICT: Check that the expected title appears near the START of the release title
     // Don't allow "He-Man and the Masters of the Universe" to match "Masters of the Universe"
-    // The first content word of expected should appear within the first 3 words of release
+    // The first content word of expected should appear within the first few words of release
     const firstExpectedWord = expectedWords[0];
     const firstExpectedIdx = releaseWords.indexOf(firstExpectedWord);
     
-    // First content word must be found and within first 3 positions (indices 0, 1, 2)
-    if (firstExpectedIdx < 0 || firstExpectedIdx > 2) {
-      return false;
+    // For SHORT titles (1-2 words like "War", "It", "Up", "The Tank"), be VERY strict
+    // First word must be at position 0 or 1 only
+    if (expectedWords.length <= 2) {
+      if (firstExpectedIdx < 0 || firstExpectedIdx > 1) {
+        return false;
+      }
+    } else {
+      // For longer titles, allow position 0, 1, or 2
+      if (firstExpectedIdx < 0 || firstExpectedIdx > 2) {
+        return false;
+      }
     }
 
     // Check year if provided (for movies)
@@ -741,12 +751,19 @@ export class RssSyncService {
       }
     }
 
-    // Check extra words limit - be stricter
+    // Check extra words limit - be stricter for short titles
     const unmatchedReleaseWords = releaseWords.filter(rw => 
       !expectedWords.some(ew => ew === rw)
     );
-    // Allow fewer extra words - max 2 or half the matched words
-    const maxExtraWords = Math.max(2, Math.floor(matchedWords.length * 0.5));
+    
+    // For short titles, allow fewer extra words
+    let maxExtraWords: number;
+    if (expectedWords.length <= 2) {
+      maxExtraWords = 1; // Very strict for short titles
+    } else {
+      maxExtraWords = Math.max(2, Math.floor(matchedWords.length * 0.5));
+    }
+    
     if (unmatchedReleaseWords.length > maxExtraWords) {
       return false;
     }

@@ -350,10 +350,12 @@ class IndexerService {
                 const tvPatterns = [
                     /\bS\d{1,2}E\d{1,2}\b/i, // S01E01
                     /\bS\d{1,2}\s*E\d{1,2}\b/i, // S01 E01
+                    /\bS\d{1,2}\b(?!\d)/i, // S01 alone (season pack) - not followed by more digits
                     /\b\d{1,2}x\d{1,2}\b/, // 1x01
                     /\bSeason\s*\d+/i, // Season 1
                     /\bEpisode\s*\d+/i, // Episode 1
                     /\bComplete\s*Series/i, // Complete Series
+                    /\bMini[\s-]*Series/i, // Mini-Series / Miniseries
                 ];
                 for (const pattern of tvPatterns) {
                     if (pattern.test(result.title)) {
@@ -406,20 +408,35 @@ class IndexerService {
             // This prevents "He-Man and the Masters of the Universe" matching "Masters of the Universe"
             const firstContentWord = contentWords[0];
             const firstContentIdx = releaseWords.indexOf(firstContentWord);
-            // First content word must be found and within first 3 positions (indices 0, 1, 2)
-            // This prevents "He-Man and the Masters of the Universe" matching "Masters of the Universe"
-            if (firstContentIdx < 0 || firstContentIdx > 2) {
-                logger_1.default.debug(`[SEARCH] Filtered (title doesn't start with expected - first word "${firstContentWord}" at position ${firstContentIdx}): "${releaseTitle}" for "${searchTitle}"`);
-                return false;
+            // For SHORT titles (1-2 content words like "War", "It", "Up", "The Tank"), be VERY strict
+            // First content word must be at position 0 or 1 only
+            if (contentWords.length <= 2) {
+                if (firstContentIdx < 0 || firstContentIdx > 1) {
+                    logger_1.default.debug(`[SEARCH] Filtered (short title "${searchTitle}" - first word "${firstContentWord}" at position ${firstContentIdx}, need 0-1): "${releaseTitle}"`);
+                    return false;
+                }
+            }
+            else {
+                // For longer titles, allow position 0, 1, or 2
+                if (firstContentIdx < 0 || firstContentIdx > 2) {
+                    logger_1.default.debug(`[SEARCH] Filtered (title doesn't start with expected - first word "${firstContentWord}" at position ${firstContentIdx}): "${releaseTitle}" for "${searchTitle}"`);
+                    return false;
+                }
             }
             // Calculate extra words in release that aren't in search
             // This prevents "Pacific Rim Uprising" matching "Rising"
             const unmatchedReleaseWords = releaseWords.filter(rw => !allSearchWords.some(sw => sw === rw));
             // Requirements:
             // 1. At least 80% of CONTENT words must match exactly
-            // 2. Release can't have more extra words than content words (stricter limit)
+            // 2. For short titles, allow fewer extra words (very strict)
             const requiredRatio = 0.8;
-            const maxExtraWords = Math.max(2, contentWords.length);
+            let maxExtraWords;
+            if (contentWords.length <= 2) {
+                maxExtraWords = 1; // Very strict for short titles
+            }
+            else {
+                maxExtraWords = Math.max(2, contentWords.length);
+            }
             if (contentMatchRatio < requiredRatio) {
                 logger_1.default.debug(`[SEARCH] Filtered (${Math.round(contentMatchRatio * 100)}% content match, need ${Math.round(requiredRatio * 100)}%): "${releaseTitle}" for "${searchTitle}"`);
                 return false;
