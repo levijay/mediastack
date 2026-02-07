@@ -223,10 +223,11 @@ export class DownloadClientService {
         }
       } catch (error: any) {
         if (error.response?.status === 403) {
-          logger.error(`[qBittorrent] ${client.name} (${baseURL}): 403 Forbidden - Check Web UI settings:`);
-          logger.error(`[qBittorrent] 1. Disable "Enable Host header validation" OR`);
-          logger.error(`[qBittorrent] 2. Add MediaStack's hostname/IP to the whitelist`);
-          logger.error(`[qBittorrent] Settings location: Options > Web UI > Security`);
+          logger.error(`[qBittorrent] ${client.name} (${baseURL}): 403 Forbidden during login`);
+          logger.error(`[qBittorrent] Fix: In qBittorrent go to Settings > Web UI > Security:`);
+          logger.error(`[qBittorrent]   1. DISABLE "Enable Host header validation" (recommended)`);
+          logger.error(`[qBittorrent]   OR`);
+          logger.error(`[qBittorrent]   2. Add MediaStack's IP address to the whitelist`);
         } else if (error.response?.status === 401) {
           logger.error(`[qBittorrent] ${client.name}: 401 Unauthorized - Invalid username or password`);
         } else if (error.code === 'ECONNREFUSED') {
@@ -287,7 +288,10 @@ export class DownloadClientService {
     try {
       const axiosClient = await this.getQBClient(client);
       if (!axiosClient) {
-        return { success: false, message: 'Failed to connect to qBittorrent' };
+        return { 
+          success: false, 
+          message: 'Failed to connect to qBittorrent. Check credentials and ensure qBittorrent Web UI is accessible. If you get 403 errors, disable "Host header validation" in qBittorrent Settings > Web UI > Security.' 
+        };
       }
 
       const formData = new URLSearchParams();
@@ -313,6 +317,16 @@ export class DownloadClientService {
 
       return { success: false, message: 'Failed to add torrent' };
     } catch (error: any) {
+      // Handle 403 specifically
+      if (error.response?.status === 403) {
+        logger.error(`[qBittorrent] ${client.name}: 403 Forbidden when adding torrent`);
+        qbSessions.delete(client.id); // Clear session
+        return { 
+          success: false, 
+          message: 'Access denied (403). In qBittorrent Web UI: Go to Settings > Web UI > Security and disable "Enable Host header validation" OR add MediaStack\'s IP to the whitelist.' 
+        };
+      }
+      
       logger.error(`[qBittorrent] ${client.name}: Failed to add torrent - ${error.message}`);
       return { success: false, message: error.message || 'Failed to add torrent' };
     }
