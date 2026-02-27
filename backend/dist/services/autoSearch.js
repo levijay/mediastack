@@ -314,10 +314,11 @@ class AutoSearchService {
                     // Skip if not monitored
                     if (!episode.monitored)
                         continue;
-                    // Skip future episodes
+                    // Skip future episodes (compare dates only, ignoring time/timezone issues)
                     if (episode.air_date) {
-                        const airDate = new Date(episode.air_date);
-                        if (airDate > new Date())
+                        // Compare just the date strings (YYYY-MM-DD format)
+                        const today = new Date().toISOString().split('T')[0];
+                        if (episode.air_date > today)
                             continue;
                     }
                     // Determine if we should search:
@@ -733,10 +734,10 @@ class AutoSearchService {
                         // Skip if already has file or not monitored
                         if (episode.has_file || !episode.monitored)
                             continue;
-                        // Skip future episodes
+                        // Skip future episodes (compare dates only, ignoring time/timezone issues)
                         if (episode.air_date) {
-                            const airDate = new Date(episode.air_date);
-                            if (airDate > new Date())
+                            const today = new Date().toISOString().split('T')[0];
+                            if (episode.air_date > today)
                                 continue;
                         }
                         allMissingEpisodes.push({

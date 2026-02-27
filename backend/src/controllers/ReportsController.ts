@@ -81,6 +81,35 @@ export class ReportsController {
         SELECT MIN(year) as min_year, MAX(year) as max_year FROM movies WHERE year IS NOT NULL
       `).get() as { min_year: number; max_year: number };
 
+      // Get distinct genres from movies (genres is JSON array)
+      let allGenres: string[] = [];
+      try {
+        const movieGenres = db.prepare(`
+          SELECT DISTINCT genres FROM movies WHERE genres IS NOT NULL AND genres != '[]' AND genres != ''
+        `).all() as { genres: string }[];
+        
+        const genreSet = new Set<string>();
+        movieGenres.forEach(row => {
+          try {
+            const genres = JSON.parse(row.genres);
+            if (Array.isArray(genres)) {
+              genres.forEach(genre => {
+                if (typeof genre === 'string' && genre.trim()) {
+                  genreSet.add(genre.trim());
+                }
+              });
+            }
+          } catch (e) {
+            // Skip invalid JSON
+            logger.debug('Failed to parse genres JSON:', row.genres);
+          }
+        });
+        allGenres = Array.from(genreSet).sort();
+      } catch (error) {
+        logger.warn('Failed to extract genres:', error);
+        allGenres = [];
+      }
+
       return res.json({
         qualities: allQualities,
         resolutions: resolutions.map(r => r.resolution),
@@ -89,7 +118,8 @@ export class ReportsController {
         hdrTypes: hdrTypes.map(h => h.video_dynamic_range),
         audioChannels: audioChannels.map(a => a.audio_channels),
         releaseGroups: releaseGroups.map(r => r.release_group),
-        yearRange: { min: yearRange?.min_year || 1900, max: yearRange?.max_year || new Date().getFullYear() }
+        yearRange: { min: yearRange?.min_year || 1900, max: yearRange?.max_year || new Date().getFullYear() },
+        genres: allGenres
       });
     } catch (error) {
       logger.error('Get filter options error:', error);
@@ -118,6 +148,7 @@ export class ReportsController {
         sizeTo,
         hasFile,
         monitored,
+        genre,
         // Special filters
         titleMismatch,
         multipleFiles,
@@ -159,6 +190,11 @@ export class ReportsController {
       if (releaseGroup) {
         conditions.push('mf.release_group = ?');
         params.push(releaseGroup);
+      }
+      if (genre) {
+        // Check if genre exists in the JSON array using json_each
+        conditions.push('EXISTS (SELECT 1 FROM json_each(m.genres) WHERE value = ?)');
+        params.push(genre);
       }
       if (yearFrom) {
         conditions.push('m.year >= ?');

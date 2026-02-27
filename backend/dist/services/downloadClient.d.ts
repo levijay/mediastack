@@ -41,11 +41,25 @@ export declare class DownloadClientService {
      */
     addDownload(url: string, mediaType: 'movie' | 'tv', savePath: string, clientId?: string, protocol?: 'torrent' | 'usenet'): Promise<AddDownloadResult>;
     private getQBUrl;
-    private getQBClient;
+    /**
+     * Login to qBittorrent and get session cookie
+     */
+    private qbLogin;
+    /**
+     * Make an authenticated request to qBittorrent
+     */
+    private qbRequest;
     private testQBittorrent;
     private addToQBittorrent;
     getQBTorrents(clientId?: string, category?: string): Promise<any[]>;
     private getSABUrl;
+    /**
+     * Get SABnzbd categories and their folder paths
+     */
+    getSABCategories(client: DownloadClient): Promise<{
+        name: string;
+        dir: string;
+    }[]>;
     private testSABnzbd;
     private addToSABnzbd;
     getSABQueue(clientId?: string): Promise<any>;

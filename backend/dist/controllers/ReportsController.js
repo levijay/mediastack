@@ -67,6 +67,35 @@ class ReportsController {
             const yearRange = database_1.default.prepare(`
         SELECT MIN(year) as min_year, MAX(year) as max_year FROM movies WHERE year IS NOT NULL
       `).get();
+            // Get distinct genres from movies (genres is JSON array)
+            let allGenres = [];
+            try {
+                const movieGenres = database_1.default.prepare(`
+          SELECT DISTINCT genres FROM movies WHERE genres IS NOT NULL AND genres != '[]' AND genres != ''
+        `).all();
+                const genreSet = new Set();
+                movieGenres.forEach(row => {
+                    try {
+                        const genres = JSON.parse(row.genres);
+                        if (Array.isArray(genres)) {
+                            genres.forEach(genre => {
+                                if (typeof genre === 'string' && genre.trim()) {
+                                    genreSet.add(genre.trim());
+                                }
+                            });
+                        }
+                    }
+                    catch (e) {
+                        // Skip invalid JSON
+                        logger_1.default.debug('Failed to parse genres JSON:', row.genres);
+                    }
+                });
+                allGenres = Array.from(genreSet).sort();
+            }
+            catch (error) {
+                logger_1.default.warn('Failed to extract genres:', error);
+                allGenres = [];
+            }
             return res.json({
                 qualities: allQualities,
                 resolutions: resolutions.map(r => r.resolution),
@@ -75,7 +104,8 @@ class ReportsController {
                 hdrTypes: hdrTypes.map(h => h.video_dynamic_range),
                 audioChannels: audioChannels.map(a => a.audio_channels),
                 releaseGroups: releaseGroups.map(r => r.release_group),
-                yearRange: { min: yearRange?.min_year || 1900, max: yearRange?.max_year || new Date().getFullYear() }
+                yearRange: { min: yearRange?.min_year || 1900, max: yearRange?.max_year || new Date().getFullYear() },
+                genres: allGenres
             });
         }
         catch (error) {
@@ -88,7 +118,7 @@ class ReportsController {
      */
     static async searchMovies(req, res) {
         try {
-            const { quality, resolution, videoCodec, audioCodec, hdrType, audioChannels, releaseGroup, yearFrom, yearTo, ratingFrom, ratingTo, sizeFrom, sizeTo, hasFile, monitored, 
+            const { quality, resolution, videoCodec, audioCodec, hdrType, audioChannels, releaseGroup, yearFrom, yearTo, ratingFrom, ratingTo, sizeFrom, sizeTo, hasFile, monitored, genre, 
             // Special filters
             titleMismatch, multipleFiles, missingFile, noRating, sortBy = 'file_size', sortDir = 'desc', limit = 100 } = req.query;
             let conditions = [];
@@ -121,6 +151,11 @@ class ReportsController {
             if (releaseGroup) {
                 conditions.push('mf.release_group = ?');
                 params.push(releaseGroup);
+            }
+            if (genre) {
+                // Check if genre exists in the JSON array using json_each
+                conditions.push('EXISTS (SELECT 1 FROM json_each(m.genres) WHERE value = ?)');
+                params.push(genre);
             }
             if (yearFrom) {
                 conditions.push('m.year >= ?');

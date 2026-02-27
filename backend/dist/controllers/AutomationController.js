@@ -300,6 +300,58 @@ class AutomationController {
             return res.status(500).json({ error: 'Failed to test connection' });
         }
     }
+    // Get SABnzbd categories
+    static async getSabnzbdCategories(req, res) {
+        try {
+            if (!req.user || req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Admin access required' });
+            }
+            const { url, apiKey } = req.body;
+            if (!url || !apiKey) {
+                return res.status(400).json({ error: 'URL and API key are required' });
+            }
+            const axios = require('axios');
+            // Get default download directory
+            const configResponse = await axios.get(`${url}/api`, {
+                params: {
+                    mode: 'get_config',
+                    section: 'misc',
+                    apikey: apiKey,
+                    output: 'json'
+                },
+                timeout: 10000
+            });
+            const defaultDir = configResponse.data?.config?.misc?.complete_dir || '';
+            // Get full config with categories
+            const fullConfigResponse = await axios.get(`${url}/api`, {
+                params: {
+                    mode: 'get_config',
+                    apikey: apiKey,
+                    output: 'json'
+                },
+                timeout: 10000
+            });
+            const categories = [];
+            // Add default category
+            categories.push({ name: 'Default (*)', dir: defaultDir || '(SABnzbd default)' });
+            // Parse categories from config
+            if (fullConfigResponse.data?.config?.categories) {
+                for (const cat of fullConfigResponse.data.config.categories) {
+                    if (cat.name && cat.name !== '*') {
+                        categories.push({
+                            name: cat.name,
+                            dir: cat.dir || defaultDir || '(inherits default)'
+                        });
+                    }
+                }
+            }
+            return res.json({ success: true, categories });
+        }
+        catch (error) {
+            logger_1.default.error('Get SABnzbd categories error:', error);
+            return res.json({ success: false, message: error.message || 'Failed to get categories', categories: [] });
+        }
+    }
     // Search for releases
     static async searchReleases(req, res) {
         try {

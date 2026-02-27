@@ -115,7 +115,7 @@ export declare class MovieModel {
      * Find missing movies that are actually available for download based on minimum_availability
      * - announced: Any movie that has been announced
      * - inCinemas: Movie has theatrical release date in the past
-     * - released: Movie has digital or physical release date in the past
+     * - released: Movie has digital or physical release date in the past, OR theatrical 90+ days ago
      */
     static findMissingAndAvailable(): Movie[];
     /**

@@ -17,6 +17,7 @@ interface FilterOptions {
  audioChannels: string[];
  releaseGroups: string[];
  yearRange: { min: number; max: number };
+ genres: string[];
 }
 
 interface MovieResult {
@@ -109,6 +110,7 @@ export function ReportingPage() {
  const [hdrType, setHdrType] = useState('');
  const [audioChannels, setAudioChannels] = useState('');
  const [releaseGroup, setReleaseGroup] = useState('');
+ const [genre, setGenre] = useState('');
  const [yearFrom, setYearFrom] = useState('');
  const [yearTo, setYearTo] = useState('');
  const [ratingFrom, setRatingFrom] = useState('');
@@ -174,6 +176,7 @@ export function ReportingPage() {
      hdrType: hdrType || undefined,
      audioChannels: audioChannels || undefined,
      releaseGroup: releaseGroup || undefined,
+     genre: genre || undefined,
      yearFrom: yearFrom ? parseInt(yearFrom) : undefined,
      yearTo: yearTo ? parseInt(yearTo) : undefined,
      ratingFrom: ratingFrom ? parseFloat(ratingFrom) : undefined,
@@ -446,6 +449,17 @@ export function ReportingPage() {
             style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}>
             <option value="">Any</option>
             {filterOptions.releaseGroups.map(r => <option key={r} value={r}>{r}</option>)}
+           </select>
+          </div>
+
+          <div>
+           <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Genre</label>
+           <select value={genre} onChange={e => setGenre(e.target.value)} className={selectClass}
+            style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}>
+            <option value="">Any</option>
+            {Array.isArray(filterOptions.genres) && filterOptions.genres.map(g => (
+              typeof g === 'string' ? <option key={g} value={g}>{g}</option> : null
+            ))}
            </select>
           </div>
          </>

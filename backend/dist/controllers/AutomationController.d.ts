@@ -11,6 +11,7 @@ export declare class AutomationController {
     static testQBittorrent(req: AuthRequest, res: Response): Promise<any>;
     static testQBittorrentWithParams(req: AuthRequest, res: Response): Promise<any>;
     static testSabnzbd(req: AuthRequest, res: Response): Promise<any>;
+    static getSabnzbdCategories(req: AuthRequest, res: Response): Promise<any>;
     static searchReleases(req: AuthRequest, res: Response): Promise<any>;
     static startDownload(req: AuthRequest, res: Response): Promise<any>;
     static getDownloads(req: AuthRequest, res: Response): Promise<any>;

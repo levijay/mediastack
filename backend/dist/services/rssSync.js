@@ -547,20 +547,27 @@ class RssSyncService {
         const normalizedRelease = normalizeTitle(extractedTitle);
         const normalizedExpected = normalizeTitle(expectedTitle);
         const releaseWords = normalizedRelease.split(/\s+/).filter(w => w.length > 0);
-        const expectedWords = normalizedExpected.split(/\s+/).filter(w => w.length > 1);
+        const allExpectedWords = normalizedExpected.split(/\s+/).filter(w => w.length > 1);
+        if (allExpectedWords.length === 0)
+            return false;
+        // Common articles that are often omitted in release names
+        const commonArticles = ['the', 'a', 'an', 'and', 'of', 'in', 'on', 'at', 'to', 'for'];
+        // Separate content words (required) from articles (optional)
+        const expectedWords = allExpectedWords.filter(w => !commonArticles.includes(w));
+        const articleWords = allExpectedWords.filter(w => commonArticles.includes(w));
         if (expectedWords.length === 0)
             return false;
-        // Require exact word matches (strict matching)
+        // Require exact CONTENT word matches (articles are optional)
         const matchedWords = expectedWords.filter(ew => releaseWords.some(rw => rw === ew));
         const matchRatio = matchedWords.length / expectedWords.length;
         if (matchRatio < 0.8)
             return false;
         // STRICT: Check that the expected title appears near the START of the release title
         // Don't allow "He-Man and the Masters of the Universe" to match "Masters of the Universe"
-        // The first content word of expected should appear within the first few words of release
+        // The first CONTENT word of expected should appear within the first few words of release
         const firstExpectedWord = expectedWords[0];
         const firstExpectedIdx = releaseWords.indexOf(firstExpectedWord);
-        // For SHORT titles (1-2 words like "War", "It", "Up", "The Tank"), be VERY strict
+        // For SHORT titles (1-2 content words like "War", "It", "Up", "The Tank"), be VERY strict
         // First word must be at position 0 or 1 only
         if (expectedWords.length <= 2) {
             if (firstExpectedIdx < 0 || firstExpectedIdx > 1) {
@@ -590,7 +597,7 @@ class RssSyncService {
             }
         }
         // Check extra words limit - be stricter for short titles
-        const unmatchedReleaseWords = releaseWords.filter(rw => !expectedWords.some(ew => ew === rw));
+        const unmatchedReleaseWords = releaseWords.filter(rw => !allExpectedWords.some(ew => ew === rw));
         // For short titles, allow fewer extra words
         let maxExtraWords;
         if (expectedWords.length <= 2) {

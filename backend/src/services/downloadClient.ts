@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import logger from '../config/logger';
 import { DownloadClientModel, DownloadClient } from '../models/DownloadClient';
 
@@ -15,7 +15,7 @@ interface TestResult {
   version?: string;
 }
 
-// qBittorrent session cookies per client
+// qBittorrent session cookies per client (clientId -> SID cookie value)
 const qbSessions: Map<string, string> = new Map();
 
 export class DownloadClientService {
@@ -144,14 +144,22 @@ export class DownloadClientService {
     }
 
     // Determine the category to use based on media type
+    // For SABnzbd: if no category is set, pass empty string so SABnzbd uses its default
+    // For qBittorrent: we can use a default category name
     let category: string;
     if (mediaType === 'movie') {
-      category = client.category_movies || client.category || 'movies';
+      category = client.category_movies || client.category || '';
     } else {
-      category = client.category_tv || client.category || 'tv';
+      category = client.category_tv || client.category || '';
+    }
+    
+    // For qBittorrent, provide a default category if none specified
+    if (client.type === 'qbittorrent' && !category) {
+      category = mediaType === 'movie' ? 'movies' : 'tv';
     }
 
-    logger.info(`[DownloadClient] Using ${client.type} client "${client.name}" for ${protocol || 'unknown'} download with category "${category}"`);
+    logger.info(`[DownloadClient] Using ${client.type} client "${client.name}" for ${protocol || 'unknown'} download`);
+    logger.info(`[DownloadClient] Category: ${category || '(using client default)'}`);
 
     let result: AddDownloadResult;
     if (client.type === 'qbittorrent') {
@@ -178,105 +186,179 @@ export class DownloadClientService {
     return `${protocol}://${client.host}:${client.port}${base}`;
   }
 
-  private async getQBClient(client: DownloadClient): Promise<AxiosInstance | null> {
+  /**
+   * Login to qBittorrent and get session cookie
+   */
+  private async qbLogin(client: DownloadClient): Promise<{ success: boolean; cookie?: string; error?: string }> {
     const baseURL = this.getQBUrl(client);
     
-    // Create axios client with Referer and Origin headers for CSRF protection
-    const axiosClient = axios.create({ 
-      baseURL, 
-      timeout: 30000,
-      headers: {
-        'Referer': baseURL,
-        'Origin': baseURL
+    try {
+      logger.debug(`[qBittorrent] ${client.name}: Logging in to ${baseURL}`);
+      
+      const response = await axios({
+        method: 'POST',
+        url: `${baseURL}/api/v2/auth/login`,
+        data: `username=${encodeURIComponent(client.username || '')}&password=${encodeURIComponent(client.password || '')}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': baseURL + '/'
+        },
+        timeout: 30000,
+        validateStatus: () => true, // Don't throw on any status
+        maxRedirects: 0
+      });
+
+      logger.debug(`[qBittorrent] ${client.name}: Login response status=${response.status}, data="${response.data}"`);
+
+      // Handle various response scenarios
+      if (response.status === 403) {
+        return { 
+          success: false, 
+          error: 'Access denied (403). Check qBittorrent Web UI is enabled and accessible.' 
+        };
       }
-    });
 
-    // Check if we have a valid session
+      if (response.status === 404) {
+        return { 
+          success: false, 
+          error: 'API not found (404). Check the URL and port are correct.' 
+        };
+      }
+
+      if (response.status >= 500) {
+        return { 
+          success: false, 
+          error: `Server error (${response.status}). qBittorrent may be having issues.` 
+        };
+      }
+
+      // Check login result
+      if (response.data === 'Fails.') {
+        return { success: false, error: 'Invalid username or password.' };
+      }
+
+      // Extract session cookie
+      const setCookie = response.headers['set-cookie'];
+      if (setCookie && setCookie.length > 0) {
+        // Extract just the SID cookie
+        const sidMatch = setCookie[0].match(/SID=([^;]+)/);
+        if (sidMatch) {
+          const cookie = `SID=${sidMatch[1]}`;
+          logger.info(`[qBittorrent] ${client.name}: Login successful`);
+          return { success: true, cookie };
+        }
+      }
+
+      // Some versions return Ok. without cookie on success
+      if (response.data === 'Ok.') {
+        logger.warn(`[qBittorrent] ${client.name}: Login OK but no SID cookie received`);
+        return { success: true, cookie: '' };
+      }
+
+      return { success: false, error: 'Unexpected response from qBittorrent' };
+
+    } catch (error: any) {
+      if (error.code === 'ECONNREFUSED') {
+        return { success: false, error: `Connection refused. Is qBittorrent running at ${baseURL}?` };
+      }
+      if (error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+        return { success: false, error: `Cannot reach ${baseURL}. Check host and port.` };
+      }
+      if (error.code === 'ECONNRESET') {
+        return { success: false, error: `Connection reset. Check if SSL setting is correct.` };
+      }
+      return { success: false, error: error.message || 'Connection failed' };
+    }
+  }
+
+  /**
+   * Make an authenticated request to qBittorrent
+   */
+  private async qbRequest(
+    client: DownloadClient, 
+    method: 'GET' | 'POST', 
+    endpoint: string, 
+    data?: string,
+    retryOnAuthFail: boolean = true
+  ): Promise<{ success: boolean; data?: any; error?: string; status?: number }> {
+    const baseURL = this.getQBUrl(client);
+    
+    // Get or create session
     let cookie = qbSessions.get(client.id);
-
     if (!cookie) {
-      // Login
-      try {
-        const response = await axiosClient.post(
-          '/api/v2/auth/login',
-          `username=${encodeURIComponent(client.username || '')}&password=${encodeURIComponent(client.password || '')}`,
-          { 
-            headers: { 
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Referer': baseURL,
-              'Origin': baseURL
-            } 
-          }
-        );
-
-        // Check if login was successful
-        if (response.data === 'Fails.') {
-          logger.error('qBittorrent login failed: Invalid credentials');
-          return null;
-        }
-
-        const setCookie = response.headers['set-cookie'];
-        if (setCookie && setCookie.length > 0) {
-          cookie = setCookie[0].split(';')[0];
-          qbSessions.set(client.id, cookie);
-          logger.info(`qBittorrent login successful for client: ${client.name}`);
-        }
-      } catch (error: any) {
-        if (error.response?.status === 403) {
-          logger.error(`[qBittorrent] ${client.name} (${baseURL}): 403 Forbidden during login`);
-          logger.error(`[qBittorrent] Fix: In qBittorrent go to Settings > Web UI > Security:`);
-          logger.error(`[qBittorrent]   1. DISABLE "Enable Host header validation" (recommended)`);
-          logger.error(`[qBittorrent]   OR`);
-          logger.error(`[qBittorrent]   2. Add MediaStack's IP address to the whitelist`);
-        } else if (error.response?.status === 401) {
-          logger.error(`[qBittorrent] ${client.name}: 401 Unauthorized - Invalid username or password`);
-        } else if (error.code === 'ECONNREFUSED') {
-          logger.error(`[qBittorrent] ${client.name}: Connection refused - Is qBittorrent running at ${baseURL}?`);
-        } else if (error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
-          logger.error(`[qBittorrent] ${client.name}: Cannot reach ${baseURL} - Check host and port`);
-        } else {
-          logger.error(`[qBittorrent] ${client.name} login failed:`, error.message);
-        }
-        return null;
+      const loginResult = await this.qbLogin(client);
+      if (!loginResult.success) {
+        return { success: false, error: loginResult.error };
+      }
+      cookie = loginResult.cookie || '';
+      if (cookie) {
+        qbSessions.set(client.id, cookie);
       }
     }
 
-    // Add cookie and CSRF headers to all requests
-    axiosClient.defaults.headers.common['Cookie'] = cookie || '';
-    axiosClient.defaults.headers.common['Referer'] = baseURL;
-    axiosClient.defaults.headers.common['Origin'] = baseURL;
-    return axiosClient;
+    try {
+      const response = await axios({
+        method,
+        url: `${baseURL}${endpoint}`,
+        data,
+        headers: {
+          'Content-Type': method === 'POST' ? 'application/x-www-form-urlencoded' : undefined,
+          'Cookie': cookie,
+          'Referer': baseURL + '/'
+        },
+        timeout: 30000,
+        validateStatus: () => true
+      });
+
+      // Handle auth failure - session may have expired
+      if (response.status === 403 && retryOnAuthFail) {
+        logger.debug(`[qBittorrent] ${client.name}: Got 403, refreshing session...`);
+        qbSessions.delete(client.id);
+        return this.qbRequest(client, method, endpoint, data, false);
+      }
+
+      if (response.status === 403) {
+        return { success: false, error: 'Access denied (403). Session refresh failed.', status: 403 };
+      }
+
+      if (response.status >= 400) {
+        return { success: false, error: `Request failed with status ${response.status}`, status: response.status };
+      }
+
+      return { success: true, data: response.data, status: response.status };
+
+    } catch (error: any) {
+      logger.error(`[qBittorrent] ${client.name}: Request to ${endpoint} failed:`, error.message);
+      return { success: false, error: error.message };
+    }
   }
 
   private async testQBittorrent(client: DownloadClient): Promise<TestResult> {
-    try {
-      // Clear session to force fresh login
-      qbSessions.delete(client.id);
-      
-      const axiosClient = await this.getQBClient(client);
-      if (!axiosClient) {
-        return { success: false, message: 'Failed to connect to qBittorrent - check credentials' };
-      }
+    // Clear any cached session for fresh test
+    qbSessions.delete(client.id);
 
-      const response = await axiosClient.get('/api/v2/app/version');
-      return {
-        success: true,
-        message: 'Connection successful',
-        version: response.data
-      };
-    } catch (error: any) {
-      logger.error('qBittorrent test failed:', error.message);
-      qbSessions.delete(client.id);
-      
-      if (error.response?.status === 403) {
-        return { 
-          success: false, 
-          message: 'Access denied (403). In qBittorrent Web UI settings: disable "Enable Host header validation" or add your MediaStack host to the whitelist.' 
-        };
-      }
-      
-      return { success: false, message: error.message || 'Connection failed' };
+    // First, try to login
+    const loginResult = await this.qbLogin(client);
+    if (!loginResult.success) {
+      return { success: false, message: loginResult.error || 'Login failed' };
     }
+
+    // Store the session
+    if (loginResult.cookie) {
+      qbSessions.set(client.id, loginResult.cookie);
+    }
+
+    // Now try to get version
+    const versionResult = await this.qbRequest(client, 'GET', '/api/v2/app/version');
+    if (!versionResult.success) {
+      return { success: false, message: versionResult.error || 'Failed to get version' };
+    }
+
+    return {
+      success: true,
+      message: 'Connection successful',
+      version: versionResult.data
+    };
   }
 
   private async addToQBittorrent(
@@ -285,51 +367,35 @@ export class DownloadClientService {
     category: string,
     savePath: string
   ): Promise<AddDownloadResult> {
-    try {
-      const axiosClient = await this.getQBClient(client);
-      if (!axiosClient) {
-        return { 
-          success: false, 
-          message: 'Failed to connect to qBittorrent. Check credentials and ensure qBittorrent Web UI is accessible. If you get 403 errors, disable "Host header validation" in qBittorrent Settings > Web UI > Security.' 
-        };
-      }
-
-      const formData = new URLSearchParams();
-      formData.append('urls', url);
-      formData.append('category', category);
-      
-      // Only set savepath if explicitly provided, otherwise use qBittorrent's default
-      if (savePath && savePath.trim()) {
-        formData.append('savepath', savePath);
-      }
-
-      if (client.tags) {
-        formData.append('tags', client.tags);
-      }
-
-      const response = await axiosClient.post('/api/v2/torrents/add', formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-
-      if (response.data === 'Ok.') {
-        return { success: true, message: 'Torrent added successfully' };
-      }
-
-      return { success: false, message: 'Failed to add torrent' };
-    } catch (error: any) {
-      // Handle 403 specifically
-      if (error.response?.status === 403) {
-        logger.error(`[qBittorrent] ${client.name}: 403 Forbidden when adding torrent`);
-        qbSessions.delete(client.id); // Clear session
-        return { 
-          success: false, 
-          message: 'Access denied (403). In qBittorrent Web UI: Go to Settings > Web UI > Security and disable "Enable Host header validation" OR add MediaStack\'s IP to the whitelist.' 
-        };
-      }
-      
-      logger.error(`[qBittorrent] ${client.name}: Failed to add torrent - ${error.message}`);
-      return { success: false, message: error.message || 'Failed to add torrent' };
+    // Build form data
+    const params = new URLSearchParams();
+    params.append('urls', url);
+    if (category) {
+      params.append('category', category);
     }
+    if (savePath && savePath.trim()) {
+      params.append('savepath', savePath);
+    }
+    if (client.tags) {
+      params.append('tags', client.tags);
+    }
+
+    const result = await this.qbRequest(client, 'POST', '/api/v2/torrents/add', params.toString());
+    
+    if (!result.success) {
+      return { success: false, message: result.error || 'Failed to add torrent' };
+    }
+
+    if (result.data === 'Ok.') {
+      return { success: true, message: 'Torrent added successfully' };
+    }
+
+    // qBittorrent returns empty response on success for some versions
+    if (result.status === 200) {
+      return { success: true, message: 'Torrent added successfully' };
+    }
+
+    return { success: false, message: 'Unexpected response when adding torrent' };
   }
 
   async getQBTorrents(clientId?: string, category?: string): Promise<any[]> {
@@ -343,26 +409,18 @@ export class DownloadClientService {
 
     if (!client) return [];
 
-    try {
-      const axiosClient = await this.getQBClient(client);
-      if (!axiosClient) return [];
-
-      const params: any = {};
-      if (category) params.category = category;
-
-      const response = await axiosClient.get('/api/v2/torrents/info', { params });
-      return response.data || [];
-    } catch (error: any) {
-      // Session may have expired, clear it so next request re-authenticates
-      qbSessions.delete(client.id);
-      
-      if (error.response?.status === 403) {
-        logger.warn(`[qBittorrent] ${client.name}: Session expired or 403 error - will retry on next sync`);
-      } else {
-        logger.error(`[qBittorrent] ${client.name}: Failed to get torrents - ${error.message}`);
-      }
+    const endpoint = category 
+      ? `/api/v2/torrents/info?category=${encodeURIComponent(category)}`
+      : '/api/v2/torrents/info';
+    
+    const result = await this.qbRequest(client, 'GET', endpoint);
+    
+    if (!result.success) {
+      logger.error(`[qBittorrent] ${client.name}: Failed to get torrents - ${result.error}`);
       return [];
     }
+
+    return result.data || [];
   }
 
   // ==================== SABnzbd ====================
@@ -373,11 +431,88 @@ export class DownloadClientService {
     return `${protocol}://${client.host}:${client.port}${base}`;
   }
 
+  /**
+   * Get SABnzbd categories and their folder paths
+   */
+  async getSABCategories(client: DownloadClient): Promise<{ name: string; dir: string }[]> {
+    try {
+      const baseURL = this.getSABUrl(client);
+      
+      // First get the default download dir
+      const configResponse = await axios.get(`${baseURL}/api`, {
+        params: {
+          mode: 'get_config',
+          section: 'misc',
+          apikey: client.api_key,
+          output: 'json'
+        },
+        timeout: 10000
+      });
+      
+      const defaultDir = configResponse.data?.config?.misc?.complete_dir || '';
+      
+      // Get categories
+      const catsResponse = await axios.get(`${baseURL}/api`, {
+        params: {
+          mode: 'get_cats',
+          apikey: client.api_key,
+          output: 'json'
+        },
+        timeout: 10000
+      });
+      
+      const categories: { name: string; dir: string }[] = [];
+      
+      // Add default category
+      categories.push({ name: '*', dir: defaultDir });
+      
+      // SABnzbd returns categories as an array of strings OR as category objects
+      if (Array.isArray(catsResponse.data?.categories)) {
+        for (const cat of catsResponse.data.categories) {
+          if (typeof cat === 'string') {
+            // Simple string array - need to get full config for dir
+            categories.push({ name: cat, dir: defaultDir });
+          } else if (cat.name) {
+            categories.push({ name: cat.name, dir: cat.dir || defaultDir });
+          }
+        }
+      }
+      
+      // Also get full category config for folder paths
+      const fullConfigResponse = await axios.get(`${baseURL}/api`, {
+        params: {
+          mode: 'get_config',
+          apikey: client.api_key,
+          output: 'json'
+        },
+        timeout: 10000
+      });
+      
+      // Parse category folders from full config
+      if (fullConfigResponse.data?.config?.categories) {
+        for (const cat of fullConfigResponse.data.config.categories) {
+          const existing = categories.find(c => c.name === cat.name);
+          if (existing) {
+            existing.dir = cat.dir || defaultDir;
+          } else {
+            categories.push({ name: cat.name, dir: cat.dir || defaultDir });
+          }
+        }
+      }
+      
+      logger.debug(`[SABnzbd] Categories: ${JSON.stringify(categories)}`);
+      return categories;
+    } catch (error: any) {
+      logger.error(`[SABnzbd] Failed to get categories: ${error.message}`);
+      return [];
+    }
+  }
+
   private async testSABnzbd(client: DownloadClient): Promise<TestResult> {
     try {
       const baseURL = this.getSABUrl(client);
       
-      // Use 'queue' mode which requires authentication, not 'version' which doesn't
+      // Use 'queue' mode which requires authentication
       const response = await axios.get(`${baseURL}/api`, {
         params: {
           mode: 'queue',
@@ -390,7 +525,7 @@ export class DownloadClientService {
 
       // If we get queue data, the API key is valid
       if (response.data?.queue !== undefined) {
-        // Also get version for display
+        // Get version
         const versionResponse = await axios.get(`${baseURL}/api`, {
           params: {
             mode: 'version',
@@ -399,22 +534,24 @@ export class DownloadClientService {
           timeout: 5000
         });
         
+        // Also verify we can get categories
+        const categories = await this.getSABCategories(client);
+        const catNames = categories.map(c => c.name).join(', ');
+        
         return {
           success: true,
-          message: 'Connection successful',
+          message: `Connection successful. Categories: ${catNames}`,
           version: versionResponse.data?.version || 'Unknown'
         };
       }
 
-      // Check for API key error
       if (response.data?.error?.toLowerCase().includes('api')) {
         return { success: false, message: 'API key is incorrect' };
       }
 
       return { success: false, message: response.data?.error || 'Invalid response from SABnzbd' };
     } catch (error: any) {
-      logger.error('SABnzbd test failed:', error.message);
-      // Check if it's an API key error in the response
+      logger.error('[SABnzbd] Test failed:', error.message);
       if (error.response?.data?.error) {
         return { success: false, message: error.response.data.error };
       }
@@ -430,28 +567,35 @@ export class DownloadClientService {
     try {
       const baseURL = this.getSABUrl(client);
       
-      logger.info(`[SABnzbd] Adding NZB from URL: ${url}`);
-      logger.info(`[SABnzbd] SABnzbd URL: ${baseURL}`);
-      logger.info(`[SABnzbd] API Key (first 8 chars): ${client.api_key?.substring(0, 8)}...`);
-      logger.info(`[SABnzbd] Category: ${client.category || category || 'Default'}`);
+      // Determine category to use
+      // If category is empty/undefined, don't send it - SABnzbd will use its default
+      const effectiveCategory = category && category.trim() ? category.trim() : undefined;
       
-      // Extract filename from URL for better naming
+      logger.info(`[SABnzbd] Adding NZB to ${client.name}`);
+      logger.info(`[SABnzbd] URL: ${url.substring(0, 100)}...`);
+      logger.info(`[SABnzbd] Category: ${effectiveCategory || '(default)'}`);
+      
+      // Extract filename from URL
       let filename = 'download.nzb';
       try {
         const urlObj = new URL(url);
-        filename = urlObj.searchParams.get('file') || urlObj.searchParams.get('title') || 'download.nzb';
+        filename = urlObj.searchParams.get('file') || 
+                   urlObj.searchParams.get('title') || 
+                   urlObj.pathname.split('/').pop() || 
+                   'download.nzb';
         if (!filename.endsWith('.nzb')) {
           filename += '.nzb';
         }
+        // Clean filename
+        filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
       } catch (e) {
         // URL parsing failed, use default
       }
 
-      // Method 1: Fetch the NZB content ourselves and upload directly
-      // This is more reliable as it avoids SABnzbd having to reach external URLs
+      // Method 1: Fetch NZB content and upload directly (most reliable)
       let nzbContent: Buffer | null = null;
       try {
-        logger.info(`[SABnzbd] Fetching NZB content from indexer...`);
+        logger.debug(`[SABnzbd] Fetching NZB from indexer...`);
         
         const nzbResponse = await axios.get(url, {
           timeout: 30000,
@@ -462,29 +606,30 @@ export class DownloadClientService {
         });
         
         nzbContent = Buffer.from(nzbResponse.data);
-        logger.info(`[SABnzbd] NZB fetched (${nzbContent.length} bytes)`);
+        logger.debug(`[SABnzbd] NZB fetched: ${nzbContent.length} bytes`);
       } catch (fetchError: any) {
-        logger.warn(`[SABnzbd] Failed to fetch NZB from indexer: ${fetchError.message}`);
+        logger.warn(`[SABnzbd] Failed to fetch NZB: ${fetchError.message}`);
       }
 
       // Try upload if we have NZB content
-      if (nzbContent) {
+      if (nzbContent && nzbContent.length > 0) {
         try {
-          logger.info(`[SABnzbd] Uploading NZB to SABnzbd...`);
-          
-          // Upload via multipart form
-          // SABnzbd requires API key in URL query params for multipart uploads
           const FormData = require('form-data');
           const formData = new FormData();
           formData.append('mode', 'addfile');
-          formData.append('cat', category);
           formData.append('output', 'json');
+          
+          // Only add category if we have one - otherwise SABnzbd uses default
+          if (effectiveCategory) {
+            formData.append('cat', effectiveCategory);
+          }
+          
           formData.append('nzbfile', nzbContent, {
             filename: filename,
             contentType: 'application/x-nzb'
           });
           
-          // API key must be in URL for SABnzbd multipart uploads
+          // API key must be in URL for multipart uploads
           const uploadUrl = `${baseURL}/api?apikey=${client.api_key}`;
           
           const uploadResponse = await axios.post(uploadUrl, formData, {
@@ -492,62 +637,62 @@ export class DownloadClientService {
             timeout: 30000
           });
           
-          logger.info(`[SABnzbd] Upload response:`, JSON.stringify(uploadResponse.data));
+          logger.debug(`[SABnzbd] Upload response: ${JSON.stringify(uploadResponse.data)}`);
           
           if (uploadResponse.data?.status === true || uploadResponse.data?.nzo_ids?.length > 0) {
+            const nzoId = uploadResponse.data.nzo_ids?.[0];
+            logger.info(`[SABnzbd] NZB uploaded successfully (nzo_id: ${nzoId})`);
             return {
               success: true,
-              message: 'NZB uploaded successfully',
-              downloadId: uploadResponse.data.nzo_ids?.[0]
+              message: 'NZB added to SABnzbd',
+              downloadId: nzoId
             };
           }
           
-          // If direct upload failed, log the error
-          logger.warn(`[SABnzbd] Direct upload failed: ${JSON.stringify(uploadResponse.data)}`);
+          logger.warn(`[SABnzbd] Upload response indicates failure: ${JSON.stringify(uploadResponse.data)}`);
         } catch (uploadError: any) {
-          logger.warn(`[SABnzbd] Upload to SABnzbd failed: ${uploadError.message}`);
-          if (uploadError.response) {
-            logger.warn(`[SABnzbd] Response status: ${uploadError.response.status}`);
-            logger.warn(`[SABnzbd] Response data: ${JSON.stringify(uploadError.response.data)}`);
-          }
+          logger.warn(`[SABnzbd] Direct upload failed: ${uploadError.message}`);
         }
       }
 
-      // Method 2: Fallback - try addurl mode (let SABnzbd fetch the URL)
-      logger.info(`[SABnzbd] Trying addurl fallback...`);
+      // Method 2: Fallback - use addurl (let SABnzbd fetch the URL)
+      logger.info(`[SABnzbd] Trying addurl method...`);
       
-      try {
-        const response = await axios.get(`${baseURL}/api`, {
-          params: {
-            mode: 'addurl',
-            name: url,
-            cat: category,
-            apikey: client.api_key,
-            output: 'json'
-          },
-          timeout: 30000
-        });
-
-        logger.info(`[SABnzbd] addurl response:`, JSON.stringify(response.data));
-
-        if (response.data?.status === true || response.data?.nzo_ids?.length > 0) {
-          return {
-            success: true,
-            message: 'NZB added successfully',
-            downloadId: response.data.nzo_ids?.[0]
-          };
-        }
-
-        return { success: false, message: response.data?.error || 'Failed to add NZB - no error message from SABnzbd' };
-      } catch (urlError: any) {
-        logger.error(`[SABnzbd] addurl fallback failed: ${urlError.message}`);
-        if (urlError.response) {
-          logger.error(`[SABnzbd] Response: ${JSON.stringify(urlError.response.data)}`);
-        }
-        return { success: false, message: urlError.message || 'Failed to add NZB' };
+      const params: Record<string, string> = {
+        mode: 'addurl',
+        name: url,
+        apikey: client.api_key!,
+        output: 'json'
+      };
+      
+      // Only add category if specified
+      if (effectiveCategory) {
+        params.cat = effectiveCategory;
       }
+      
+      const response = await axios.get(`${baseURL}/api`, {
+        params,
+        timeout: 30000
+      });
+
+      logger.debug(`[SABnzbd] addurl response: ${JSON.stringify(response.data)}`);
+
+      if (response.data?.status === true || response.data?.nzo_ids?.length > 0) {
+        const nzoId = response.data.nzo_ids?.[0];
+        logger.info(`[SABnzbd] NZB added via URL (nzo_id: ${nzoId})`);
+        return {
+          success: true,
+          message: 'NZB added to SABnzbd',
+          downloadId: nzoId
+        };
+      }
+
+      const errorMsg = response.data?.error || 'SABnzbd did not accept the NZB';
+      logger.error(`[SABnzbd] Failed: ${errorMsg}`);
+      return { success: false, message: errorMsg };
+      
     } catch (error: any) {
-      logger.error('[SABnzbd] Unexpected error adding NZB:', error.message);
+      logger.error(`[SABnzbd] Error adding NZB: ${error.message}`);
       return { success: false, message: error.message || 'Failed to add NZB' };
     }
   }
@@ -628,23 +773,18 @@ export class DownloadClientService {
       return false;
     }
 
-    try {
-      const axiosClient = await this.getQBClient(client);
-      if (!axiosClient) return false;
+    const formData = new URLSearchParams();
+    formData.append('hashes', hash);
+    formData.append('deleteFiles', deleteFiles ? 'true' : 'false');
 
-      const formData = new URLSearchParams();
-      formData.append('hashes', hash);
-      formData.append('deleteFiles', deleteFiles ? 'true' : 'false');
-
-      await axiosClient.post('/api/v2/torrents/delete', formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-
-      return true;
-    } catch (error: any) {
-      logger.error(`[qBittorrent] ${client.name}: Failed to remove torrent - ${error.message}`);
+    const result = await this.qbRequest(client, 'POST', '/api/v2/torrents/delete', formData.toString());
+    
+    if (!result.success) {
+      logger.error(`[qBittorrent] ${client.name}: Failed to remove torrent - ${result.error}`);
       return false;
     }
+
+    return true;
   }
 
   /**
@@ -712,22 +852,17 @@ export class DownloadClientService {
       return false;
     }
 
-    try {
-      const axiosClient = await this.getQBClient(client);
-      if (!axiosClient) return false;
+    const formData = new URLSearchParams();
+    formData.append('hashes', hash);
 
-      const formData = new URLSearchParams();
-      formData.append('hashes', hash);
-
-      await axiosClient.post('/api/v2/torrents/pause', formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-
-      return true;
-    } catch (error: any) {
-      logger.error(`[qBittorrent] ${client.name}: Failed to pause torrent - ${error.message}`);
+    const result = await this.qbRequest(client, 'POST', '/api/v2/torrents/pause', formData.toString());
+    
+    if (!result.success) {
+      logger.error(`[qBittorrent] ${client.name}: Failed to pause torrent - ${result.error}`);
       return false;
     }
+
+    return true;
   }
 }
 

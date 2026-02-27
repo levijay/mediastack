@@ -144,10 +144,11 @@ class MovieModel {
      * Find missing movies that are actually available for download based on minimum_availability
      * - announced: Any movie that has been announced
      * - inCinemas: Movie has theatrical release date in the past
-     * - released: Movie has digital or physical release date in the past
+     * - released: Movie has digital or physical release date in the past, OR theatrical 90+ days ago
      */
     static findMissingAndAvailable() {
         const today = new Date().toISOString().split('T')[0];
+        const currentYear = new Date().getFullYear();
         const stmt = database_1.default.prepare(`
       SELECT m.*, 
         COALESCE(mf.total_size, m.file_size, 0) as file_size,
@@ -173,17 +174,28 @@ class MovieModel {
           OR (m.minimum_availability = 'released' AND (
             m.digital_release_date <= ? 
             OR m.physical_release_date <= ?
+            -- Fallback: theatrical was 90+ days ago and no digital/physical date
+            OR (m.theatrical_release_date IS NOT NULL 
+                AND m.digital_release_date IS NULL 
+                AND m.physical_release_date IS NULL
+                AND julianday(?) - julianday(m.theatrical_release_date) >= 90)
+            -- Fallback: TMDB says Released and movie is from previous year
+            OR (m.tmdb_status = 'Released' AND m.year < ?)
           ))
-          -- Fallback for movies without minimum_availability set - use release date
+          -- Fallback for movies without minimum_availability set - use release date or fallbacks
           OR (m.minimum_availability IS NULL AND (
             m.digital_release_date <= ? 
             OR m.physical_release_date <= ?
-            OR m.tmdb_status = 'Released'
+            OR (m.tmdb_status = 'Released' AND m.year < ?)
+            OR (m.theatrical_release_date IS NOT NULL 
+                AND m.digital_release_date IS NULL 
+                AND m.physical_release_date IS NULL
+                AND julianday(?) - julianday(m.theatrical_release_date) >= 90)
           ))
         )
       ORDER BY m.title ASC
     `);
-        return stmt.all(today, today, today, today, today).map(m => ({
+        return stmt.all(today, today, today, today, currentYear, today, today, currentYear, today).map(m => ({
             ...m,
             monitored: m.monitored === 1,
             has_file: m.has_file === 1
@@ -194,6 +206,7 @@ class MovieModel {
      */
     static isMovieAvailable(movie) {
         const today = new Date().toISOString().split('T')[0];
+        const todayDate = new Date();
         const availability = movie.minimum_availability || 'released';
         // Cancelled movies are never available
         if (movie.tmdb_status === 'Canceled') {
@@ -217,6 +230,21 @@ class MovieModel {
                     return true;
                 if (movie.physical_release_date && movie.physical_release_date <= today)
                     return true;
+                // Fallback: If no digital/physical date but theatrical was 90+ days ago, 
+                // assume digital release is available (typical theatrical-to-digital window)
+                if (movie.theatrical_release_date && !movie.digital_release_date && !movie.physical_release_date) {
+                    const theatricalDate = new Date(movie.theatrical_release_date);
+                    const daysSinceTheatrical = Math.floor((todayDate.getTime() - theatricalDate.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSinceTheatrical >= 90)
+                        return true;
+                }
+                // Additional fallback: If TMDB says "Released" and it's been a while, assume available
+                if (movie.tmdb_status === 'Released' && movie.year) {
+                    const currentYear = todayDate.getFullYear();
+                    // If movie is from previous year or earlier, likely available
+                    if (movie.year < currentYear)
+                        return true;
+                }
                 return false;
         }
     }

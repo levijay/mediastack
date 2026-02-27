@@ -39,6 +39,7 @@ router.post('/import-lists/sync-all', requireRole(['admin']), ImportListControll
 router.post('/download-client/test', requireRole(['admin']), AutomationController.testQBittorrent);
 router.post('/download-client/test/qbittorrent', requireRole(['admin']), AutomationController.testQBittorrentWithParams);
 router.post('/download-client/test/sabnzbd', requireRole(['admin']), AutomationController.testSabnzbd);
+router.post('/download-client/sabnzbd/categories', requireRole(['admin']), AutomationController.getSabnzbdCategories);
 
 // Search releases
 router.get('/search', AutomationController.searchReleases);

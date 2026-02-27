@@ -47,8 +47,10 @@ export function RecentActivityPage() {
 
  const paginatedActivity = paginateItems(filteredActivity);
 
- // Get unique event types for filter
- const eventTypes = [...new Set(activity.map(a => a.event_type))];
+ // Get unique event types for filter, sorted alphabetically
+ const eventTypes = [...new Set(activity.map(a => a.event_type))].sort((a, b) => 
+  a.toLowerCase().localeCompare(b.toLowerCase())
+ );
 
  // Get icon and color for activity event type
  const getActivityStyle = (eventType: string) => {
@@ -131,11 +133,11 @@ export function RecentActivityPage() {
     </div>
 
     {/* Filters - Downloads smartbar style */}
-    <div className="flex flex-wrap items-center gap-3">
-     <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-1">
+    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+     <div className="inline-flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 p-1 min-w-max">
       <button
        onClick={() => { setFilter('all'); resetPage(); }}
-       className={`px-3 py-1 text-sm rounded transition-colors ${
+       className={`px-3 py-1.5 text-sm rounded transition-colors whitespace-nowrap ${
         filter === 'all' 
          ? 'bg-primary-500 text-white' 
          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -147,7 +149,7 @@ export function RecentActivityPage() {
        <button
         key={type}
         onClick={() => { setFilter(type); resetPage(); }}
-        className={`px-3 py-1 text-sm rounded transition-colors capitalize ${
+        className={`px-3 py-1.5 text-sm rounded transition-colors capitalize whitespace-nowrap ${
          filter === type 
           ? 'bg-primary-500 text-white' 
           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'

@@ -1256,6 +1256,7 @@ class ApiService {
     hdrType?: string;
     audioChannels?: string;
     releaseGroup?: string;
+    genre?: string;
     yearFrom?: number;
     yearTo?: number;
     ratingFrom?: number;
@@ -1280,6 +1281,7 @@ class ApiService {
     if (filters.hdrType) params.hdrType = filters.hdrType;
     if (filters.audioChannels) params.audioChannels = filters.audioChannels;
     if (filters.releaseGroup) params.releaseGroup = filters.releaseGroup;
+    if (filters.genre) params.genre = filters.genre;
     if (filters.yearFrom) params.yearFrom = filters.yearFrom;
     if (filters.yearTo) params.yearTo = filters.yearTo;
     if (filters.ratingFrom) params.ratingFrom = filters.ratingFrom;
