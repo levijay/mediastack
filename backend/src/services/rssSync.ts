@@ -584,13 +584,43 @@ export class RssSyncService {
   private detectQuality(title: string): string {
     const upperTitle = title.toUpperCase();
     
-    // Resolution
+    // Check for low-quality theatrical/pre-release sources FIRST
+    // These are standalone quality types regardless of resolution
+    if (upperTitle.includes('TELESYNC') || upperTitle.includes('TS-') || upperTitle.includes('.TS.') || 
+        upperTitle.includes('HDTS') || upperTitle.includes('HD-TS') || upperTitle.includes('PDVD')) {
+      return 'TELESYNC';
+    }
+    
+    if (upperTitle.includes('TELECINE') || upperTitle.includes('TC-') || upperTitle.includes('.TC.') ||
+        upperTitle.includes('HDTC') || upperTitle.includes('HD-TC')) {
+      return 'TELECINE';
+    }
+    
+    if (upperTitle.includes('CAM') || upperTitle.includes('HDCAM') || upperTitle.includes('HD-CAM') ||
+        upperTitle.includes('CAMRIP') || upperTitle.includes('CAM-RIP')) {
+      return 'CAM';
+    }
+    
+    if (upperTitle.includes('DVDSCR') || upperTitle.includes('DVD-SCR') || upperTitle.includes('DVDSCREENER') ||
+        upperTitle.includes('SCREENER') || upperTitle.includes('SCR')) {
+      return 'DVDSCR';
+    }
+    
+    if (upperTitle.includes('WORKPRINT') || upperTitle.includes('WP-') || upperTitle.includes('.WP.')) {
+      return 'WORKPRINT';
+    }
+    
+    if (upperTitle.includes('REGIONAL')) {
+      return 'REGIONAL';
+    }
+    
+    // Resolution-based quality detection
     if (upperTitle.includes('2160P') || upperTitle.includes('4K') || upperTitle.includes('UHD')) {
       if (upperTitle.includes('REMUX')) return 'Remux-2160p';
       if (upperTitle.includes('BLURAY') || upperTitle.includes('BD')) return 'Bluray-2160p';
       if (upperTitle.includes('WEB-DL') || upperTitle.includes('WEBDL')) return 'WEBDL-2160p';
       if (upperTitle.includes('WEBRIP') || upperTitle.includes('WEB-RIP')) return 'WEBRip-2160p';
-      if (upperTitle.includes('WEB')) return 'WEBDL-2160p';
+      if (upperTitle.includes('WEB')) return 'WEB-2160p';
       return 'HDTV-2160p';
     }
     
@@ -599,7 +629,7 @@ export class RssSyncService {
       if (upperTitle.includes('BLURAY') || upperTitle.includes('BD')) return 'Bluray-1080p';
       if (upperTitle.includes('WEB-DL') || upperTitle.includes('WEBDL')) return 'WEBDL-1080p';
       if (upperTitle.includes('WEBRIP') || upperTitle.includes('WEB-RIP')) return 'WEBRip-1080p';
-      if (upperTitle.includes('WEB')) return 'WEBDL-1080p';
+      if (upperTitle.includes('WEB')) return 'WEB-1080p';
       return 'HDTV-1080p';
     }
     
@@ -607,7 +637,7 @@ export class RssSyncService {
       if (upperTitle.includes('BLURAY') || upperTitle.includes('BD')) return 'Bluray-720p';
       if (upperTitle.includes('WEB-DL') || upperTitle.includes('WEBDL')) return 'WEBDL-720p';
       if (upperTitle.includes('WEBRIP') || upperTitle.includes('WEB-RIP')) return 'WEBRip-720p';
-      if (upperTitle.includes('WEB')) return 'WEBDL-720p';
+      if (upperTitle.includes('WEB')) return 'WEB-720p';
       return 'HDTV-720p';
     }
     
@@ -615,9 +645,9 @@ export class RssSyncService {
       return 'SDTV';
     }
     
-    // Default
+    // Default (no resolution found)
     if (upperTitle.includes('WEB-DL') || upperTitle.includes('WEBDL')) return 'WEBDL-1080p';
-    if (upperTitle.includes('WEB')) return 'WEBDL-1080p';
+    if (upperTitle.includes('WEB')) return 'WEB-1080p';
     if (upperTitle.includes('HDTV')) return 'HDTV-1080p';
     if (upperTitle.includes('BLURAY') || upperTitle.includes('BD')) return 'Bluray-1080p';
     

@@ -66,41 +66,36 @@ export interface SeriesFolderInfo {
 }
 
 export class FileNamingService {
-  private _config: NamingConfig | null = null;
-
-  // Lazy-load config to avoid accessing DB before initialization
+  // Always read fresh config from database to ensure changes take effect immediately
   private get config(): NamingConfig {
-    if (!this._config) {
-      try {
-        this._config = NamingConfigModel.get();
-      } catch (error) {
-        // Return defaults if DB not ready
-        logger.warn('NamingConfig not available, using defaults');
-        return {
-          id: 1,
-          rename_movies: true,
-          rename_episodes: true,
-          replace_illegal_characters: true,
-          colon_replacement: ' - ',
-          standard_movie_format: '{Movie Title} ({Release Year}) [{Quality Full}]',
-          movie_folder_format: '{Movie Title} ({Release Year})',
-          standard_episode_format: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} [{Quality Full}]',
-          daily_episode_format: '{Series Title} - {Air-Date} - {Episode Title} [{Quality Full}]',
-          anime_episode_format: '{Series Title} - S{season:00}E{episode:00} - {absolute:000} - {Episode Title} [{Quality Full}]',
-          series_folder_format: '{Series Title} ({Series Year})',
-          season_folder_format: 'Season {season:00}',
-          specials_folder_format: 'Specials',
-          multi_episode_style: 'prefixed_range',
-          updated_at: new Date().toISOString()
-        };
-      }
+    try {
+      return NamingConfigModel.get();
+    } catch (error) {
+      // Return defaults if DB not ready
+      logger.warn('NamingConfig not available, using defaults');
+      return {
+        id: 1,
+        rename_movies: true,
+        rename_episodes: true,
+        replace_illegal_characters: true,
+        colon_replacement: ' - ',
+        standard_movie_format: '{Movie Title} ({Release Year}) [{Quality Full}]',
+        movie_folder_format: '{Movie Title} ({Release Year})',
+        standard_episode_format: '{Series Title} - S{season:00}E{episode:00} - {Episode Title} [{Quality Full}]',
+        daily_episode_format: '{Series Title} - {Air-Date} - {Episode Title} [{Quality Full}]',
+        anime_episode_format: '{Series Title} - S{season:00}E{episode:00} - {absolute:000} - {Episode Title} [{Quality Full}]',
+        series_folder_format: '{Series Title} ({Series Year})',
+        season_folder_format: 'Season {season:00}',
+        specials_folder_format: 'Specials',
+        multi_episode_style: 'prefixed_range',
+        updated_at: new Date().toISOString()
+      };
     }
-    return this._config;
   }
 
-  // Refresh config from database
+  // No-op for backwards compatibility - config is always read fresh from DB now
   refreshConfig(): void {
-    this._config = null; // Clear cache, will reload on next access
+    // Config is no longer cached, so nothing to refresh
   }
 
   // Clean a string for use in filenames
@@ -173,11 +168,16 @@ export class FileNamingService {
 
   // Generate movie filename
   generateMovieFilename(info: MovieNamingInfo, extension: string): string {
-    if (!this.config.rename_movies) {
+    const config = this.config;
+    logger.debug(`[FileNaming] rename_movies setting: ${config.rename_movies}`);
+    logger.debug(`[FileNaming] standard_movie_format: ${config.standard_movie_format}`);
+    
+    if (!config.rename_movies) {
+      logger.info(`[FileNaming] Renaming disabled, returning empty string`);
       return ''; // Return empty to indicate no rename
     }
 
-    let filename = this.config.standard_movie_format;
+    let filename = config.standard_movie_format;
     const cleanedTitle = this.cleanTitle(info.title);
 
     // Movie title tokens
@@ -248,18 +248,23 @@ export class FileNamingService {
 
   // Generate episode filename
   generateEpisodeFilename(info: EpisodeNamingInfo, extension: string): string {
-    if (!this.config.rename_episodes) {
+    const config = this.config;
+    logger.debug(`[FileNaming] rename_episodes setting: ${config.rename_episodes}`);
+    logger.debug(`[FileNaming] standard_episode_format: ${config.standard_episode_format}`);
+    
+    if (!config.rename_episodes) {
+      logger.info(`[FileNaming] Episode renaming disabled, returning empty string`);
       return ''; // Return empty to indicate no rename
     }
 
     // Choose format based on episode type
     let filename: string;
     if (info.isDaily && info.airDate) {
-      filename = this.config.daily_episode_format;
+      filename = config.daily_episode_format;
     } else if (info.isAnime && info.absoluteNumber) {
-      filename = this.config.anime_episode_format;
+      filename = config.anime_episode_format;
     } else {
-      filename = this.config.standard_episode_format;
+      filename = config.standard_episode_format;
     }
 
     const cleanedSeriesTitle = this.cleanTitle(info.seriesTitle);

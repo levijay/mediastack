@@ -802,9 +802,13 @@ class DownloadSyncService {
             dynamicRange,
             releaseGroup
         }, ext);
+        logger_1.default.info(`[Import] Rename info: title="${movie.title}", year=${movie.year}, quality=${quality}, codec=${videoCodec}, group=${releaseGroup}`);
+        logger_1.default.info(`[Import] Generated filename: "${generatedName || '(none - renaming disabled or failed)'}"`);
+        logger_1.default.info(`[Import] Original filename: "${sourceFilename}"`);
         // Use generated name if available, otherwise keep original
         const destFilename = generatedName || sourceFilename;
         const destPath = path_1.default.join(movie.folder_path, destFilename);
+        logger_1.default.info(`[Import] Final destination filename: "${destFilename}"`);
         try {
             // Verify we're copying a file, not a directory
             const sourceStat2 = fs_1.default.statSync(videoFile);
@@ -983,10 +987,23 @@ class DownloadSyncService {
                 const episodes = TVSeries_1.TVSeriesModel.findEpisodesBySeason(series.id, episodeInfo.season);
                 const episode = episodes.find(e => e.episode_number === episodeInfo.episode);
                 if (episode) {
-                    const quality = this.parseQuality(sourceFilename);
-                    const videoCodec = this.parseVideoCodec(sourceFilename);
-                    const audioCodec = this.parseAudioCodec(sourceFilename);
-                    const releaseGroup = this.parseReleaseGroup(sourceFilename);
+                    const ext = path_1.default.extname(videoFile);
+                    const releaseName = torrent?.name || download.title || '';
+                    const combinedName = `${sourceFilename} ${releaseName}`;
+                    // Parse quality from release name first (more reliable), then filename
+                    let quality = this.parseQuality(releaseName) || this.parseQuality(sourceFilename);
+                    const releaseQuality = this.parseQuality(releaseName);
+                    if (releaseQuality && ['CAM', 'TELESYNC', 'TELECINE', 'DVDSCR', 'WORKPRINT', 'R5'].includes(releaseQuality)) {
+                        quality = releaseQuality;
+                    }
+                    const videoCodec = this.parseVideoCodec(combinedName);
+                    const audioCodec = this.parseAudioCodec(combinedName);
+                    const releaseGroup = this.parseReleaseGroup(releaseName) || this.parseReleaseGroup(sourceFilename);
+                    const dynamicRange = this.parseDynamicRange(combinedName);
+                    const audioChannels = this.parseAudioChannels(combinedName);
+                    // Detect if this is a proper or repack release
+                    const isProper = /\bPROPER\b/i.test(combinedName);
+                    const isRepack = /\bREPACK\b|\bREREIP\b/i.test(combinedName);
                     // Delete existing episode file if present (for upgrades)
                     if (episode.has_file && episode.file_path && fs_1.default.existsSync(episode.file_path)) {
                         try {
@@ -1003,7 +1020,28 @@ class DownloadSyncService {
                         fs_1.default.mkdirSync(seasonFolder, { recursive: true });
                         logger_1.default.info(`Created folder: ${seasonFolder}`);
                     }
-                    const destPath = path_1.default.join(seasonFolder, sourceFilename);
+                    // Generate renamed filename using fileNamingService
+                    const generatedName = fileNaming_1.fileNamingService.generateEpisodeFilename({
+                        seriesTitle: series.title,
+                        seriesYear: series.year || undefined,
+                        seasonNumber: episodeInfo.season,
+                        episodeNumber: episodeInfo.episode,
+                        episodeTitle: episode.title || undefined,
+                        quality,
+                        videoCodec,
+                        audioCodec,
+                        audioChannels,
+                        dynamicRange,
+                        releaseGroup,
+                        proper: isProper
+                    }, ext);
+                    logger_1.default.info(`[Import] Episode rename info: series="${series.title}", S${episodeInfo.season}E${episodeInfo.episode}, quality=${quality}`);
+                    logger_1.default.info(`[Import] Generated filename: "${generatedName || '(none - renaming disabled)'}"`);
+                    logger_1.default.info(`[Import] Original filename: "${sourceFilename}"`);
+                    // Use generated name if available, otherwise keep original
+                    const destFilename = generatedName || sourceFilename;
+                    const destPath = path_1.default.join(seasonFolder, destFilename);
+                    logger_1.default.info(`[Import] Final destination: ${destPath}`);
                     const sourceDir = path_1.default.dirname(videoFile);
                     const sourceIsInSeriesFolder = videoFile.startsWith(series.folder_path + path_1.default.sep);
                     try {
@@ -1062,8 +1100,8 @@ class DownloadSyncService {
                             }
                         }
                         // Log activity: Episode Imported
-                        ActivityLog_1.ActivityLogModel.logSeriesEvent(series.id, ActivityLog_1.EVENT_TYPES.IMPORTED, `S${episodeInfo.season}E${episodeInfo.episode} imported`, JSON.stringify({
-                            filename: sourceFilename,
+                        ActivityLog_1.ActivityLogModel.logSeriesEvent(series.id, ActivityLog_1.EVENT_TYPES.IMPORTED, `${series.title} S${String(episodeInfo.season).padStart(2, '0')}E${String(episodeInfo.episode).padStart(2, '0')} imported`, JSON.stringify({
+                            filename: destFilename,
                             quality: actualQuality,
                             videoCodec: actualVideoCodec,
                             audioCodec: actualAudioCodec
@@ -1072,11 +1110,11 @@ class DownloadSyncService {
                         notification_1.notificationService.notify({
                             event: 'onFileImport',
                             title: 'Episode Imported',
-                            message: `${series.title} S${episodeInfo.season}E${episodeInfo.episode} imported`,
+                            message: `${series.title} S${String(episodeInfo.season).padStart(2, '0')}E${String(episodeInfo.episode).padStart(2, '0')} imported`,
                             mediaType: 'episode',
                             mediaTitle: series.title
                         }).catch(err => logger_1.default.error('Notification error:', err));
-                        logger_1.default.info(`Imported episode S${episodeInfo.season}E${episodeInfo.episode} with file: ${sourceFilename}`);
+                        logger_1.default.info(`Imported ${series.title} S${episodeInfo.season}E${episodeInfo.episode} with file: ${destFilename}`);
                     }
                     catch (error) {
                         logger_1.default.error(`Failed to import episode file:`, error);

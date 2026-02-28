@@ -58,7 +58,6 @@ export interface SeriesFolderInfo {
     imdbId?: string;
 }
 export declare class FileNamingService {
-    private _config;
     private get config();
     refreshConfig(): void;
     private cleanTitle;

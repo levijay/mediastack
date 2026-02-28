@@ -844,14 +844,38 @@ class IndexerService {
         return results;
     }
     extractQuality(title) {
-        const titleLower = title.toLowerCase();
-        if (titleLower.includes('2160p') || titleLower.includes('4k'))
-            return '4K';
-        if (titleLower.includes('1080p'))
+        const upper = title.toUpperCase();
+        // Check for low-quality theatrical sources first (standalone qualities)
+        if (upper.includes('TELESYNC') || upper.includes('TS-') || upper.includes('.TS.') ||
+            upper.includes('HDTS') || upper.includes('HD-TS') || upper.includes('PDVD')) {
+            return 'TELESYNC';
+        }
+        if (upper.includes('TELECINE') || upper.includes('TC-') || upper.includes('.TC.') ||
+            upper.includes('HDTC') || upper.includes('HD-TC')) {
+            return 'TELECINE';
+        }
+        if (upper.includes('CAM') || upper.includes('HDCAM') || upper.includes('HD-CAM') ||
+            upper.includes('CAMRIP') || upper.includes('CAM-RIP')) {
+            return 'CAM';
+        }
+        if (upper.includes('DVDSCR') || upper.includes('DVD-SCR') || upper.includes('DVDSCREENER') ||
+            upper.includes('SCREENER')) {
+            return 'DVDSCR';
+        }
+        if (upper.includes('WORKPRINT') || upper.includes('WP-') || upper.includes('.WP.')) {
+            return 'WORKPRINT';
+        }
+        if (upper.includes('REGIONAL')) {
+            return 'REGIONAL';
+        }
+        // Resolution-based quality
+        if (upper.includes('2160P') || upper.includes('4K'))
+            return '2160p';
+        if (upper.includes('1080P'))
             return '1080p';
-        if (titleLower.includes('720p'))
+        if (upper.includes('720P'))
             return '720p';
-        if (titleLower.includes('480p'))
+        if (upper.includes('480P'))
             return '480p';
         return 'Unknown';
     }

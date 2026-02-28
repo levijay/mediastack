@@ -470,21 +470,27 @@ class AutoSearchService {
         const upper = title.toUpperCase();
         // First check for low quality sources (these override resolution detection)
         // These are standalone qualities without resolution
-        if (upper.includes('WORKPRINT')) {
+        if (upper.includes('WORKPRINT') || upper.includes('WP-') || upper.includes('.WP.')) {
             return 'WORKPRINT';
         }
-        if (upper.includes('CAM') || upper.includes('CAMRIP') || upper.includes('CAM-RIP')) {
+        if (upper.includes('CAM') || upper.includes('HDCAM') || upper.includes('HD-CAM') ||
+            upper.includes('CAMRIP') || upper.includes('CAM-RIP')) {
             return 'CAM';
         }
-        if (upper.includes('TELESYNC') || upper.includes('TS ') || upper.includes(' TS ') ||
-            upper.includes('HDTS') || upper.includes('PDVD')) {
+        if (upper.includes('TELESYNC') || upper.includes('TS-') || upper.includes('.TS.') ||
+            upper.includes('HDTS') || upper.includes('HD-TS') || upper.includes('PDVD')) {
             return 'TELESYNC';
         }
-        if (upper.includes('TELECINE') || upper.includes(' TC ') || upper.includes('TC ')) {
+        if (upper.includes('TELECINE') || upper.includes('TC-') || upper.includes('.TC.') ||
+            upper.includes('HDTC') || upper.includes('HD-TC')) {
             return 'TELECINE';
         }
-        if (upper.includes('DVDSCR') || upper.includes('DVD-SCR') || upper.includes('SCREENER')) {
+        if (upper.includes('DVDSCR') || upper.includes('DVD-SCR') || upper.includes('DVDSCREENER') ||
+            upper.includes('SCREENER') || upper.includes('SCR')) {
             return 'DVDSCR';
+        }
+        if (upper.includes('REGIONAL')) {
+            return 'REGIONAL';
         }
         // Detect resolution
         let resolution = '';
